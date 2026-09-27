@@ -1,7 +1,11 @@
 import { createApp } from './app.js';
 import { ENV } from './config/env.js';
+import { initializeCleanDatabase } from './config/initDatabase.js';
 
 const app = createApp();
+
+// Auto-initialize clean DB structure if needed
+initializeCleanDatabase();
 
 const server = app.listen(ENV.PORT, () => {
   console.log(`=======================================================`);
