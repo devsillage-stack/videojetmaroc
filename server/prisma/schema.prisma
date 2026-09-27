@@ -1,0 +1,921 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  DIRECTION
+  COMMERCIAL
+  RESPONSABLE_SAV
+  TECHNICIEN_SAV
+  MAGASINIER
+  COMPTABILITE
+}
+
+enum ClientType {
+  PROSPECT
+  CLIENT
+}
+
+enum IndustrySector {
+  AGROALIMENTAIRE
+  PHARMACEUTIQUE
+  COSMETIQUE
+  BOISSONS
+  AUTOMOBILE_CABLE
+  CHIMIE
+  EMBALLAGE
+  AUTRE
+}
+
+enum ClientStatus {
+  ACTIF
+  INACTIF
+  EN_PROSPECTION
+}
+
+enum MachineTechnology {
+  CIJ
+  LASER_CO2
+  LASER_FIBRE
+  TTO
+  TIJ
+  LPA
+}
+
+enum MachineStatus {
+  OPERATIONNELLE
+  EN_PANNE
+  EN_MAINTENANCE
+  ARRETEE
+  RETIREE
+}
+
+enum ContractType {
+  SILVER
+  GOLD
+  PLATINUM
+  GARANTIE
+}
+
+enum ContractStatus {
+  ACTIF
+  EXPIRE
+  RESILIE
+  EN_ATTENTE
+}
+
+enum TicketPriority {
+  CRITIQUE_LIGNE_ARRETEE
+  HAUTE
+  NORMALE
+  BASSE
+}
+
+enum TicketStatus {
+  OUVERT
+  ASSIGNE
+  EN_COURS
+  EN_ATTENTE_PIECE
+  RESOLU
+  CLOTURE
+}
+
+enum InterventionType {
+  CURATIVE
+  PREVENTIVE
+  INSTALLATION
+  AUDIT
+  FORMATION
+}
+
+enum InterventionStatus {
+  PLANIFIEE
+  EN_COURS
+  TERMINEE
+  ANNULEE
+}
+
+enum ProductType {
+  ENCRE
+  SOLVANT_MAKEUP
+  NETTOYANT
+  RUBAN_TTO
+  TETE_IMPRESSION
+  FILTRE
+  VALVE
+  MODULE_COEUR
+  PIECE_MECANIQUE
+  CARTE_ELECTRONIQUE
+  ACCESSOIRE
+  AUTRE
+}
+
+enum ProductUnit {
+  LITRE
+  CARTOUCHE
+  ROULEAU
+  PIECE
+  KIT
+}
+
+enum BatchStatus {
+  VALIDE
+  ALERTE_PEREMPTION
+  PERIME
+  EPUISE
+}
+
+enum OpportunityStage {
+  QUALIFICATION
+  DEMO_ESSAI
+  DEVIS_ENVOYE
+  NEGOCIATION
+  GAGNE
+  PERDU
+}
+
+enum QuoteStatus {
+  BROUILLON
+  EN_ATTENTE_VALIDATION
+  ENVOYE
+  ACCEPTE
+  REFUSE
+  EXPIRE
+}
+
+enum InvoiceStatus {
+  EMISE
+  PAYEE_PARTIEL
+  PAYEE
+  EN_RETARD
+  ANNULEE
+}
+
+enum OrderStatus {
+  BROUILLON
+  CONFIRMEE
+  EN_PREPARATION
+  EXPEDIEE
+  LIVREE
+  ANNULEE
+}
+
+enum AuditStatus {
+  BROUILLON
+  COMPLETE
+  VALIDE
+}
+
+enum ActivityType {
+  APPEL
+  REUNION
+  VISITE
+  EMAIL
+  AUDIT
+  DEVIS
+  TICKET
+  NOTE
+}
+
+enum PurchaseOrderStatus {
+  BROUILLON
+  SOUMISE
+  APPROUVEE
+  EN_TRANSIT
+  RECUE_COMPLETE
+  RECUE_PARTIELLE
+  ANNULEE
+}
+
+enum StockMovementType {
+  ENTREE_ACHAT
+  SORTIE_INTERVENTION
+  SORTIE_VENTE
+  TRANSFERT_DEPOT
+  AJUSTEMENT_INVENTAIRE
+  REBUT_PERIME
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role      @default(COMMERCIAL)
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  interventions         Intervention[]       @relation("TechnicianInterventions")
+  assignedTickets        MaintenanceTicket[] @relation("AssignedTickets")
+  opportunities         Opportunity[]        @relation("AssignedOpportunities")
+  quotesCreated         Quote[]              @relation("QuotesCreated")
+  auditsCreated         IndustrialAudit[]    @relation("AuditsCreated")
+  ordersCreated         Order[]              @relation("OrdersCreated")
+  purchaseOrdersCreated PurchaseOrder[]      @relation("PurchaseOrdersCreated")
+  activities            CustomerActivity[]
+  stockMovements        StockMovement[]
+  auditLogs             AuditLog[]
+}
+
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  userEmail  String?
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, STATUS_CHANGE
+  entity     String   // Client, Machine, Intervention, Quote, Product, etc.
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Currency {
+  code        String   @id // MAD, EUR, USD
+  symbol      String
+  name        String
+  isBase      Boolean  @default(false)
+  rateToBase  Float    @default(1.0) // 1 EUR = 10.85 MAD, 1 USD = 10.10 MAD
+  updatedAt   DateTime @default(now())
+
+  ratesHistory ExchangeRateHistory[]
+}
+
+model ExchangeRateHistory {
+  id           String   @id @default(uuid())
+  currencyCode String
+  rateToBase   Float
+  recordedAt   DateTime @default(now())
+
+  currency Currency @relation(fields: [currencyCode], references: [code], onDelete: Cascade)
+}
+
+model TaxRate {
+  id        String   @id @default(uuid())
+  name      String   // TVA 20%, TVA 0% (Export/Exonération)
+  rate      Float    // 20.0, 0.0
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  quotes Quote[]
+}
+
+model Client {
+  id              String         @id @default(uuid())
+  code            String         @unique // CLI-2024-001
+  name            String
+  type            ClientType     @default(CLIENT)
+  industrySector  IndustrySector @default(AGROALIMENTAIRE)
+  ice             String?        // Identifiant Commun de l'Entreprise (Maroc)
+  rc              String?        // Registre de Commerce
+  ifTax           String?        // Identifiant Fiscal
+  address         String?
+  city            String         @default("Casablanca")
+  country         String         @default("Maroc")
+  phone           String?
+  email           String?
+  website         String?
+  status          ClientStatus   @default(ACTIF)
+  defaultCurrency String         @default("MAD")
+  creditLimit     Float?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  contacts      ClientContact[]
+  sites         Site[]
+  machines      Machine[]
+  contracts     MaintenanceContract[]
+  tickets       MaintenanceTicket[]
+  interventions Intervention[]
+  opportunities Opportunity[]
+  quotes        Quote[]
+  invoices      Invoice[]
+  audits        IndustrialAudit[]
+  tcoCalculations TcoCalculation[]
+  orders        Order[]
+  activities    CustomerActivity[]
+}
+
+model ClientContact {
+  id         String   @id @default(uuid())
+  clientId   String
+  firstName  String
+  lastName   String
+  position   String?  // Ex: Directeur Usine, Resp Maintenance, Chef Ligne
+  phone      String?
+  email      String?
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Site {
+  id            String   @id @default(uuid())
+  clientId      String
+  name          String   // Ex: Usine Ain Sebaa, Site Tanger Med, Site Agadir
+  address       String?
+  city          String   @default("Casablanca")
+  contactPerson String?
+  phone         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  productionLines ProductionLine[]
+  machines        Machine[]
+  audits          IndustrialAudit[]
+}
+
+model ProductionLine {
+  id                String   @id @default(uuid())
+  siteId            String
+  name              String   // Ex: Ligne Tetra Pak 1, Ligne Flacons Verre 3
+  speedUnitsPerHour Int?
+  productType       String?  // Ex: Briques lait 1L, Canettes 33cl, Boîtes pharma
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  machines Machine[]
+  audits   IndustrialAudit[]
+}
+
+model MachineModel {
+  id                    String            @id @default(uuid())
+  modelNumber           String            @unique // Ex: "1580", "1880", "3340", "6530", "Wolke m610"
+  family                MachineTechnology
+  name                  String            // Ex: "Videojet 1880 CIJ Printer"
+  description           String?
+  maxSpeed              String?           // Ex: "334 m/min"
+  resolution            String?           // Ex: "600 dpi"
+  ipRating              String?           // Ex: "IP66"
+  standardWarrantyMonths Int              @default(12)
+  datasheetUrl          String?
+  createdAt             DateTime          @default(now())
+
+  machines             Machine[]
+  quoteItems           QuoteItem[]
+  auditRecommendations AuditRecommendation[]
+  tcoCalculations      TcoCalculation[]
+  orderItems           OrderItem[]
+}
+
+model Machine {
+  id                  String        @id @default(uuid())
+  serialNumber        String        @unique // Ex: "VJ1880-MA-2023-0491"
+  modelId             String
+  clientId            String
+  siteId              String?
+  lineId              String?
+  status              MachineStatus @default(OPERATIONNELLE)
+  installDate         DateTime      @default(now())
+  warrantyEndDate     DateTime?
+  totalOperatingHours Float         @default(0.0)
+  totalPrintsCount    BigInt        @default(0)
+  qrCodeData          String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  model         MachineModel        @relation(fields: [modelId], references: [id])
+  client        Client              @relation(fields: [clientId], references: [id])
+  site          Site?               @relation(fields: [siteId], references: [id])
+  line          ProductionLine?     @relation(fields: [lineId], references: [id])
+  tickets       MaintenanceTicket[]
+  interventions Intervention[]
+}
+
+model MaintenanceContract {
+  id                String         @id @default(uuid())
+  contractNumber    String         @unique // Ex: "CTR-2024-0012"
+  clientId          String
+  type              ContractType   @default(GOLD)
+  startDate         DateTime
+  endDate           DateTime
+  status            ContractStatus @default(ACTIF)
+  annualCost        Float
+  currency          String         @default("MAD")
+  visitsPerYear     Int            @default(4)
+  visitsCompleted   Int            @default(0)
+  responseTimeHours Int            @default(8) // SLA 4h, 8h, 24h
+  includesParts     Boolean        @default(false)
+  includesConsumables Boolean      @default(false)
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model MaintenanceTicket {
+  id                String         @id @default(uuid())
+  ticketNumber      String         @unique // Ex: "TCK-2024-0105"
+  machineId         String
+  clientId          String
+  assignedToId      String?
+  priority          TicketPriority @default(NORMALE)
+  status            TicketStatus   @default(OUVERT)
+  faultDescription  String
+  errorCode         String?        // Code erreur Videojet ex: "E104-M", "E302-Core"
+  reportedBy        String?        // Nom opérateur / resp ligne
+  resolutionNotes   String?
+  slaTargetResponseAt   DateTime?
+  slaTargetResolutionAt DateTime?
+  firstRespondedAt      DateTime?
+  resolvedAt            DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  machine       Machine        @relation(fields: [machineId], references: [id])
+  client        Client         @relation(fields: [clientId], references: [id])
+  assignedTo    User?          @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  interventions Intervention[]
+}
+
+model Intervention {
+  id                  String             @id @default(uuid())
+  interventionNumber  String             @unique // Ex: "INT-2024-0089"
+  ticketId            String?
+  machineId           String
+  technicianId        String
+  clientId            String
+  type                InterventionType   @default(CURATIVE)
+  status              InterventionStatus @default(PLANIFIEE)
+  scheduledDate       DateTime
+  startedAt           DateTime?
+  completedAt         DateTime?
+  hoursSpent          Float              @default(0.0)
+  travelHours         Float              @default(0.0)
+  travelDistanceKm    Float              @default(0.0)
+  travelExpenses      Float              @default(0.0)
+  meterReadingHours   Float?
+  meterReadingPrints  BigInt?
+  diagnosis           String?
+  workDone            String?
+  customerFeedback    String?
+  customerSignature   String?            // Data URL Base64 image
+  customerSignerName  String?
+  customerSignerTitle String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  ticket     MaintenanceTicket?     @relation(fields: [ticketId], references: [id])
+  machine    Machine                @relation(fields: [machineId], references: [id])
+  technician User                   @relation("TechnicianInterventions", fields: [technicianId], references: [id])
+  client     Client                 @relation(fields: [clientId], references: [id])
+  partsUsed  InterventionPartUsed[]
+}
+
+model Product {
+  id                String            @id @default(uuid())
+  partNumber        String            @unique // Ex: "V411-D", "500-0036-610"
+  name              String
+  type              ProductType
+  technology        MachineTechnology @default(CIJ)
+  description       String?
+  unitPrice         Float             // Prix de vente catalogue
+  costPrice         Float             // Prix d'achat / coût de revient (confidentiel)
+  currency          String            @default("MAD")
+  stockQuantity     Float             @default(0.0)
+  minStockThreshold Float             @default(10.0)
+  unit              ProductUnit       @default(CARTOUCHE)
+  safetySheetUrl    String?
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  supplierId        String?
+  supplier          Supplier?         @relation(fields: [supplierId], references: [id])
+  batches           StockBatch[]
+  partsUsed         InterventionPartUsed[]
+  quoteItems        QuoteItem[]
+  orderItems        OrderItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stockMovements    StockMovement[]
+}
+
+model StockBatch {
+  id                String      @id @default(uuid())
+  productId         String
+  batchNumber       String      // Ex: "LOT-VJ-2024-089"
+  expirationDate    DateTime
+  quantity          Float
+  receivedDate      DateTime    @default(now())
+  warehouseLocation String?     // Ex: "Casablanca Aisle 3 - Shelf B"
+  status            BatchStatus @default(VALIDE)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  product        Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  partsUsed      InterventionPartUsed[]
+  stockMovements StockMovement[]
+}
+
+model InterventionPartUsed {
+  id             String  @id @default(uuid())
+  interventionId String
+  productId      String
+  batchId        String?
+  quantity       Float
+  unitPrice      Float
+
+  intervention Intervention @relation(fields: [interventionId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+  batch        StockBatch?  @relation(fields: [batchId], references: [id])
+}
+
+model Opportunity {
+  id                 String           @id @default(uuid())
+  title              String           // Ex: "Renouvellement 3x CIJ Ligne Danone"
+  clientId           String
+  assignedToId       String
+  stage              OpportunityStage @default(QUALIFICATION)
+  expectedValue      Float            @default(0.0)
+  currency           String           @default("MAD")
+  probabilityPercent Int              @default(50)
+  closeDate          DateTime?
+  lostReason         String?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  client     Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedTo User    @relation("AssignedOpportunities", fields: [assignedToId], references: [id])
+  quotes     Quote[]
+}
+
+model Quote {
+  id             String      @id @default(uuid())
+  quoteNumber    String      @unique // Ex: "DEV-2024-0045"
+  clientId       String
+  opportunityId  String?
+  createdById    String
+  taxRateId      String
+  status         QuoteStatus @default(BROUILLON)
+  currency       String      @default("MAD")
+  exchangeRate   Float       @default(1.0)
+  subtotalHt     Float       @default(0.0)
+  discountPercent Float      @default(0.0)
+  discountAmount Float       @default(0.0)
+  totalHt        Float       @default(0.0)
+  taxAmount      Float       @default(0.0)
+  totalTtc       Float       @default(0.0)
+  totalCost      Float       @default(0.0) // Protégé par permissions
+  estimatedMargin Float      @default(0.0) // Protégé par permissions
+  validUntil     DateTime
+  paymentTerms   String?     // Ex: "30 jours fin de mois", "50% à la commande"
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  client      Client      @relation(fields: [clientId], references: [id])
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
+  createdBy   User        @relation("QuotesCreated", fields: [createdById], references: [id])
+  taxRate     TaxRate     @relation(fields: [taxRateId], references: [id])
+  items       QuoteItem[]
+  invoices    Invoice[]
+  orders      Order[]
+}
+
+model QuoteItem {
+  id              String   @id @default(uuid())
+  quoteId         String
+  itemType        String   // "MACHINE", "PRODUCT", "SERVICE", "CONTRAT"
+  machineModelId  String?
+  productId       String?
+  description     String
+  quantity        Float    @default(1.0)
+  unitPrice       Float
+  costPrice       Float    @default(0.0)
+  discountPercent Float    @default(0.0)
+  totalLineHt     Float
+  createdAt       DateTime @default(now())
+
+  quote        Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  machineModel MachineModel? @relation(fields: [machineModelId], references: [id])
+  product      Product?      @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique // Ex: "FAC-2024-0038"
+  quoteId       String?
+  clientId      String
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  status        InvoiceStatus @default(EMISE)
+  currency      String        @default("MAD")
+  exchangeRate  Float         @default(1.0)
+  subtotalHt    Float         @default(0.0)
+  taxAmount     Float         @default(0.0)
+  totalTtc      Float         @default(0.0)
+  paidAmount    Float         @default(0.0)
+  paymentMethod String?       // VIREMENT, CHEQUE, EFFET
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  quote  Quote? @relation(fields: [quoteId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model IndustrialAudit {
+  id                      String            @id @default(uuid())
+  auditNumber             String            @unique // Ex: "AUD-2026-0001"
+  clientId                String
+  siteId                  String?
+  lineId                  String?
+  createdById             String
+  status                  AuditStatus       @default(BROUILLON)
+  lineSpeedMpm            Float?            // Vitesse convoyeur en mètres/min
+  unitsPerHour            Int?              // Cadence pièces/heure
+  packagingSubstrate      String            // Ex: "Bouteille Verre", "Film PE", "Carton verni", "Canette Alu"
+  ambientTempMin          Float?            // Température min °C
+  ambientTempMax          Float?            // Température max °C
+  dustLevel               String?           // "Faible", "Modéré", "Sévère / Poussiéreux"
+  washdownExposure        Boolean           @default(false) // Lavage à grande eau (IP66 requis)
+  printLocation           String?           // Bouchon, goulot, étiquette, fond de boîte
+  messageHeightMm         Float?            // Hauteur caractères en mm
+  messageLinesCount       Int               @default(2) // 1 à 5 lignes
+  opticalDistanceMm       Float?            // Distance tête - produit
+  existingMachineBrand    String?           // Ex: "Markem-Imaje", "Domino", "Hitachi", "Ancien Videojet"
+  existingMachineModel    String?
+  existingMachineAgeYears Int?
+  currentPainPoints       String?           // Pannes fréquentes, consommation d'encre élevée, buses bouchées
+  currentConsumableCostPerYear Float?       // Coût annuel estimé en consommables
+  currentDowntimeHoursPerYear  Float?       // Heures d'arrêt de ligne par an
+  photos                  String[]          @default([]) // URLs des photos de ligne
+  notes                   String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  client          Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  site            Site?                @relation(fields: [siteId], references: [id])
+  line            ProductionLine?      @relation(fields: [lineId], references: [id])
+  createdBy       User                 @relation("AuditsCreated", fields: [createdById], references: [id])
+  recommendations AuditRecommendation[]
+  tcoCalculations TcoCalculation[]
+}
+
+model AuditRecommendation {
+  id                 String            @id @default(uuid())
+  auditId            String
+  recommendedTech    MachineTechnology
+  recommendedModelId String?
+  confidenceScore    Float             @default(90.0) // 0 - 100%
+  justification      String            // Explication technique détaillée
+  suggestedConsumable String?          // Encre recommandée (ex: V411-D MEK résistant condensation)
+  assumptions        String?           // Hypothèses prises en compte
+  missingDataNotes   String?           // Données manquantes éventuelles
+  createdAt          DateTime          @default(now())
+
+  audit            IndustrialAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  recommendedModel MachineModel?   @relation(fields: [recommendedModelId], references: [id])
+}
+
+model TcoCalculation {
+  id                             String   @id @default(uuid())
+  calculationNumber              String   @unique // Ex: "TCO-2026-0001"
+  auditId                        String?
+  clientId                       String
+  machineModelId                 String?
+  calculationName                String   // Ex: "Étude TCO Ligne 1 - Remplacement CIJ vs 1880"
+  // Solution existante
+  existingAnnualConsumableCost   Float
+  existingAnnualMaintenanceCost  Float
+  existingAnnualDowntimeLosses   Float
+  totalExistingAnnualCost        Float
+  // Solution Videojet proposée
+  equipmentInvestmentPrice       Float
+  installationAndTrainingPrice   Float
+  videojetAnnualConsumableCost   Float
+  videojetAnnualMaintenanceCost  Float
+  totalVideojetFirstYearCost     Float
+  totalVideojetSubsequentAnnualCost Float
+  // Résultats comparatifs calculés
+  estimatedAnnualSavings         Float
+  paybackPeriodMonths            Float    // Délai retour sur investissement
+  costPerMarkedProductExisting   Float
+  costPerMarkedProductVideojet   Float
+  disclaimer                     String   @default("Estimation indicative basée sur les paramètres de production saisis. Ne constitue pas un engagement contractuel.")
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+
+  audit        IndustrialAudit? @relation(fields: [auditId], references: [id])
+  client       Client           @relation(fields: [clientId], references: [id])
+  machineModel MachineModel?    @relation(fields: [machineModelId], references: [id])
+}
+
+model Order {
+  id                   String      @id @default(uuid())
+  orderNumber          String      @unique // Ex: "CMD-2026-0001"
+  quoteId              String?
+  clientId             String
+  createdById          String
+  status               OrderStatus @default(CONFIRMEE)
+  currency             String      @default("MAD")
+  exchangeRate         Float       @default(1.0)
+  subtotalHt           Float       @default(0.0)
+  taxAmount            Float       @default(0.0)
+  totalTtc             Float       @default(0.0)
+  deliveryAddress      String?
+  estimatedDeliveryDate DateTime?
+  actualDeliveryDate   DateTime?
+  trackingNumber       String?
+  notes                String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  quote     Quote?      @relation(fields: [quoteId], references: [id])
+  client    Client     @relation(fields: [clientId], references: [id])
+  createdBy User       @relation("OrdersCreated", fields: [createdById], references: [id])
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  itemType        String   // "MACHINE", "PRODUCT", "SERVICE", "CONTRAT"
+  machineModelId  String?
+  productId       String?
+  description     String
+  quantity        Float    @default(1.0)
+  unitPrice       Float
+  totalLineHt     Float
+  createdAt       DateTime @default(now())
+
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  machineModel MachineModel? @relation(fields: [machineModelId], references: [id])
+  product      Product?      @relation(fields: [productId], references: [id])
+}
+
+model Competitor {
+  id                    String            @id @default(uuid())
+  brand                 String            // "Markem-Imaje", "Domino", "Linx", "Hitachi", "Leibinger"
+  modelName             String            // Ex: "9450", "Ax350i", "8900"
+  technology            MachineTechnology @default(CIJ)
+  indicativePrice       Float?
+  currency              String            @default("MAD")
+  technicalPoints       String?           // Points techniques observés
+  commercialStrengths   String?           // Forces commerciales déclarées
+  reportedWeaknesses    String?           // Faiblesses signalées par les clients (bouchage buses, etc.)
+  clientObjections      String?           // Objections courantes
+  videojetWinningPitch  String?           // Argumentaire différenciateur Videojet gagnant
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+}
+
+model CustomerActivity {
+  id          String       @id @default(uuid())
+  clientId    String
+  userId      String
+  type        ActivityType @default(NOTE)
+  title       String
+  description String?
+  performedAt DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Supplier {
+  id              String          @id @default(uuid())
+  code            String          @unique // Ex: "FRN-001"
+  name            String          // Ex: "Videojet Technologies Inc."
+  contactName     String?
+  email           String?
+  phone           String?
+  address         String?
+  city            String?         // Ex: "Wood Dale, IL" / "Casablanca"
+  country         String          @default("Maroc")
+  paymentTerms    String?         // Ex: "30 jours net", "Comptant"
+  currency        String          @default("MAD")
+  rating          Float           @default(5.0)
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  products        Product[]
+  purchaseOrders  PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id                   String              @id @default(uuid())
+  orderNumber          String              @unique // Ex: "ACH-2026-0001"
+  supplierId           String
+  createdById          String
+  status               PurchaseOrderStatus @default(BROUILLON)
+  currency             String              @default("MAD")
+  exchangeRate         Float               @default(1.0)
+  subtotalHt           Float               @default(0.0)
+  taxAmount            Float               @default(0.0)
+  totalTtc             Float               @default(0.0)
+  orderDate            DateTime            @default(now())
+  expectedDeliveryDate DateTime?
+  receivedDate         DateTime?
+  trackingNumber       String?
+  notes                String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  supplier       Supplier            @relation(fields: [supplierId], references: [id])
+  createdBy      User                @relation("PurchaseOrdersCreated", fields: [createdById], references: [id])
+  items          PurchaseOrderItem[]
+  stockMovements StockMovement[]
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid())
+  purchaseOrderId  String
+  productId        String
+  quantity         Float         @default(1.0)
+  receivedQuantity Float         @default(0.0)
+  unitPrice        Float
+  totalLineHt      Float
+  createdAt        DateTime      @default(now())
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+}
+
+model StockMovement {
+  id              String            @id @default(uuid())
+  movementNumber  String            @unique // Ex: "MVT-2026-0001"
+  productId       String
+  batchId         String?
+  purchaseOrderId String?
+  userId          String?
+  type            StockMovementType
+  quantity        Float             // Positive for entries, negative for exits
+  stockBefore     Float
+  stockAfter      Float
+  reason          String?           // Ex: "Réception commande ACH-2026-0001"
+  createdAt       DateTime          @default(now())
+
+  product       Product        @relation(fields: [productId], references: [id])
+  batch         StockBatch?    @relation(fields: [batchId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  user          User?          @relation(fields: [userId], references: [id])
+}
+
+model CompanySettings {
+  id            String   @id @default("default")
+  companyName   String   @default("VIDEOJET MAROC SARL")
+  tagline       String?  @default("Solutions Professionnelles de Codage, Marquage et Traçabilité Industrielle")
+  formJuridique String?  @default("SARL")
+  capitalSocial String?  @default("1 000 000 DH")
+  address       String?  @default("Boulevard Ahl Loghlam, Z.I. Sidi Bernoussi")
+  city          String?  @default("Casablanca")
+  postalCode    String?  @default("20600")
+  country       String?  @default("Maroc")
+  phone         String?  @default("+212 522 75 40 00")
+  email         String?  @default("contact@videojet.ma")
+  website       String?  @default("www.videojet.ma")
+  ice           String?  @default("001892847000082")
+  ifTax         String?  @default("24890123")
+  rc            String?  @default("412098 Casablanca")
+  patente       String?  @default("34120987")
+  cnss          String?  @default("8901234")
+  bankName      String?  @default("Attijariwafa Bank Maroc")
+  bankAgency    String?  @default("Agence Sidi Bernoussi Casablanca")
+  rib           String?  @default("007 780 0001234567890123 45")
+  swift         String?  @default("BCMAMAMC")
+  logoUrl       String?
+  logoWidth     Int      @default(140)
+  primaryColor  String   @default("#002b49")
+  accentColor   String   @default("#ff5c00")
+  headerStyle   String   @default("MODERN")
+  termsTemplate String?  @default("Conditions : Règlement à 30 jours fin de mois. Matériel neuf garanti 12 mois pièces et main-d'œuvre.")
+  updatedAt     DateTime @updatedAt
+}
+
+
+

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="vjGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#002B49"/>
+      <stop offset="100%" stop-color="#071927"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5C00"/>
+      <stop offset="100%" stop-color="#FF8A3D"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="38" fill="url(#vjGrad)"/>
+  <rect x="24" y="52" width="144" height="88" rx="14" fill="#0E2E4E" stroke="#1F4E79" stroke-width="4"/>
+  <!-- Printer top slot -->
+  <rect x="56" y="34" width="80" height="24" rx="6" fill="#1C3F65" stroke="#336B9F" stroke-width="3"/>
+  <!-- Paper / Print stream -->
+  <rect x="66" y="24" width="60" height="20" rx="3" fill="#FFFFFF"/>
+  <line x1="74" y1="31" x2="118" y2="31" stroke="#002B49" stroke-width="2" stroke-linecap="round"/>
+  <line x1="74" y1="36" x2="104" y2="36" stroke="#FF5C00" stroke-width="2" stroke-linecap="round"/>
+  <!-- Print head nozzle stream -->
+  <circle cx="96" cy="94" r="22" fill="url(#accentGrad)"/>
+  <text x="96" y="102" font-family="Arial, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" text-anchor="middle">VJ</text>
+  <!-- Industrial dots for CIJ drops -->
+  <circle cx="56" cy="116" r="4" fill="#00D26A"/>
+  <circle cx="70" cy="116" r="4" fill="#00D26A"/>
+  <circle cx="122" cy="116" r="4" fill="#FF5C00"/>
+  <circle cx="136" cy="116" r="4" fill="#FF5C00"/>
+</svg>
