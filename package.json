@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Plateforme industrielle Videojet Maroc - Gestion commerciale, technique, SAV, parc machines, consommables",
   "private": true,
+  "main": "index.js",
   "workspaces": [
     "server",
     "client"
