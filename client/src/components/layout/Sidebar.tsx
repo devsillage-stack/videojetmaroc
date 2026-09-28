@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Role } from '../../types/index.js';
+import { NexoraLogo } from '../common/NexoraLogo.js';
 
 interface NavItem {
   to: string;
@@ -157,16 +158,8 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 bg-videojet-blue text-white flex flex-col shrink-0 border-r border-slate-800 select-none">
       {/* Brand Header */}
-      <div className="h-16 flex items-center gap-3 px-6 border-b border-white/10 bg-slate-950/20">
-        <div className="w-8 h-8 rounded-lg bg-videojet-orange flex items-center justify-center font-bold text-white shadow-md">
-          VJ
-        </div>
-        <div>
-          <h1 className="font-bold text-sm tracking-wide text-white">VIDEOJET</h1>
-          <p className="text-[10px] text-cyan-300 font-medium tracking-wider uppercase">
-            Maroc Industrial
-          </p>
-        </div>
+      <div className="h-16 flex items-center px-4 border-b border-white/10 bg-slate-950/30">
+        <NexoraLogo size="sm" variant="glow" />
       </div>
 
       {/* Navigation Links */}

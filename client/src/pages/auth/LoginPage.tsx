@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
+import { NexoraLogo } from '../../components/common/NexoraLogo.js';
 
 const DEMO_ACCOUNTS = [
   { role: 'Super Admin', email: 'superadmin@videojet.ma', desc: 'Accès absolu système & audit' },
@@ -49,15 +50,16 @@ export const LoginPage: React.FC = () => {
       {/* Background industrial decoration */}
       <div className="absolute inset-0 bg-radial-gradient from-videojet-blue/40 to-slate-950 pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-videojet-blue border border-cyan-500/40 text-cyan-400 font-extrabold text-2xl shadow-xl shadow-cyan-950/50 mb-4">
-          VJ
-        </div>
-        <h2 className="text-3xl font-extrabold text-white tracking-tight">
-          VIDEOJET MAROC
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center flex flex-col items-center">
+        <NexoraLogo size="xl" variant="glow" showText={false} className="mb-4" />
+        <h2 className="text-3xl font-black text-white tracking-wider flex items-center justify-center gap-2">
+          <span>NEXORA</span>
+          <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xs">
+            OS
+          </span>
         </h2>
-        <p className="mt-1 text-sm text-cyan-400 font-medium">
-          Plateforme Industrielle de Gestion B2B
+        <p className="mt-1.5 text-xs text-cyan-300 font-semibold tracking-widest uppercase">
+          Plateforme Industrielle & Système d'Exploitation B2B
         </p>
       </div>
 

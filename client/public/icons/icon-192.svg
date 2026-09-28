@@ -1,28 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
   <defs>
-    <linearGradient id="vjGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#002B49"/>
-      <stop offset="100%" stop-color="#071927"/>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E1E2F"/>
+      <stop offset="100%" stop-color="#050C16"/>
     </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF5C00"/>
-      <stop offset="100%" stop-color="#FF8A3D"/>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="60%" stop-color="#00A3FF"/>
+      <stop offset="100%" stop-color="#0047FF"/>
     </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9900"/>
+      <stop offset="50%" stop-color="#FF5C00"/>
+      <stop offset="100%" stop-color="#E60049"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
   </defs>
-  <rect width="192" height="192" rx="38" fill="url(#vjGrad)"/>
-  <rect x="24" y="52" width="144" height="88" rx="14" fill="#0E2E4E" stroke="#1F4E79" stroke-width="4"/>
-  <!-- Printer top slot -->
-  <rect x="56" y="34" width="80" height="24" rx="6" fill="#1C3F65" stroke="#336B9F" stroke-width="3"/>
-  <!-- Paper / Print stream -->
-  <rect x="66" y="24" width="60" height="20" rx="3" fill="#FFFFFF"/>
-  <line x1="74" y1="31" x2="118" y2="31" stroke="#002B49" stroke-width="2" stroke-linecap="round"/>
-  <line x1="74" y1="36" x2="104" y2="36" stroke="#FF5C00" stroke-width="2" stroke-linecap="round"/>
-  <!-- Print head nozzle stream -->
-  <circle cx="96" cy="94" r="22" fill="url(#accentGrad)"/>
-  <text x="96" y="102" font-family="Arial, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" text-anchor="middle">VJ</text>
-  <!-- Industrial dots for CIJ drops -->
-  <circle cx="56" cy="116" r="4" fill="#00D26A"/>
-  <circle cx="70" cy="116" r="4" fill="#00D26A"/>
-  <circle cx="122" cy="116" r="4" fill="#FF5C00"/>
-  <circle cx="136" cy="116" r="4" fill="#FF5C00"/>
+  <!-- Background Tech Shield -->
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad)"/>
+  <rect x="6" y="6" width="180" height="180" rx="38" fill="none" stroke="url(#cyanGrad)" stroke-width="2" stroke-opacity="0.3"/>
+
+  <!-- NEXORA Interlocking Infinite N -->
+  <!-- Cyan Ribbon -->
+  <path d="M 48 54 L 84 34 L 84 94 L 48 122 Z" fill="url(#cyanGrad)" opacity="0.95"/>
+  <path d="M 84 94 L 144 142 L 144 162 L 84 134 Z" fill="url(#cyanGrad)" opacity="0.85"/>
+
+  <!-- Amber Ribbon -->
+  <path d="M 144 142 L 108 162 L 108 102 L 144 74 Z" fill="url(#amberGrad)" opacity="0.95"/>
+  <path d="M 108 102 L 48 54 L 48 34 L 108 62 Z" fill="url(#amberGrad)" opacity="0.85"/>
+
+  <!-- Precision Bevel Highlight -->
+  <path d="M 48 54 L 84 94 L 108 102 L 144 142 L 108 162 L 84 134 L 48 122 Z" fill="#FFFFFF" fill-opacity="0.12"/>
+
+  <!-- Precision Laser Core -->
+  <circle cx="96" cy="98" r="9" fill="#FFFFFF" filter="url(#glow)"/>
+  <circle cx="96" cy="98" r="4.5" fill="#00F0FF"/>
+  <line x1="96" y1="72" x2="96" y2="124" stroke="#00F0FF" stroke-width="1.5" stroke-opacity="0.6" stroke-dasharray="2 3"/>
+  <line x1="70" y1="98" x2="122" y2="98" stroke="#FF5C00" stroke-width="1.5" stroke-opacity="0.6" stroke-dasharray="2 3"/>
 </svg>

@@ -48,7 +48,7 @@ export const createApp = () => {
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'UP',
-      system: 'VIDEOJET MAROC INDUSTRIAL PLATFORM',
+      system: 'NEXORA INDUSTRIAL PLATFORM',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     });

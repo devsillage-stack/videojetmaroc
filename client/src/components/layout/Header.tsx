@@ -17,6 +17,11 @@ export const Header: React.FC = () => {
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
       <div className="flex items-center gap-3">
+        <span className="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">
+          <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+          <span className="font-bold text-slate-900 tracking-wide">NEXORA</span>
+          <span className="text-[10px] text-slate-400 font-mono">v1.0</span>
+        </span>
         <NetworkStatus />
       </div>
 

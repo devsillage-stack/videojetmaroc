@@ -29,7 +29,7 @@ export const AiCopilotPage: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: `👋 Bonjour ! Je suis le **Copilot IA Industriel Videojet Maroc**.\n\nJe suis entraîné sur l'ensemble des manuels techniques constructeur, la chimie des encres et les données terrain de Videojet Maroc.\n\nComment puis-je vous assister aujourd'hui ?`,
+      content: `👋 Bonjour ! Je suis le **Copilot IA Industriel NEXORA**.\n\nJe suis entraîné sur l'ensemble des manuels techniques constructeur, la chimie des encres et les données terrain industrielles.\n\nComment puis-je vous assister aujourd'hui ?`,
     },
   ]);
   const [chatInput, setChatInput] = useState('');

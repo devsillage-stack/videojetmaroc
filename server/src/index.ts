@@ -9,7 +9,7 @@ initializeCleanDatabase();
 
 const server = app.listen(ENV.PORT, () => {
   console.log(`=======================================================`);
-  console.log(`🚀 VIDEOJET MAROC INDUSTRIAL PLATFORM API RUNNING`);
+  console.log(`🚀 NEXORA INDUSTRIAL PLATFORM API RUNNING`);
   console.log(`📡 URL: http://localhost:${ENV.PORT}`);
   console.log(`⚙️  Environment: ${ENV.NODE_ENV}`);
   console.log(`=======================================================`);

@@ -202,7 +202,7 @@ export const SettingsPage: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'Specimen_Mise_En_Page_Videojet.pdf');
+      link.setAttribute('download', 'Specimen_Mise_En_Page_NEXORA.pdf');
       document.body.appendChild(link);
       link.click();
       link.remove();
