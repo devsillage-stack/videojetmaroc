@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   ShieldCheck,
   PlusCircle,
+  Building2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -218,33 +219,111 @@ export const DashboardPage: React.FC = () => {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Technology Distribution Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="lg:col-span-2 min-w-0 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                {t('dashboard.machinesByTech')}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  {t('dashboard.machinesByTech')}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                  {kpis.totalMachines} machine(s)
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Ventilation du parc Videojet par technologie d'impression
               </p>
             </div>
+            {kpis.totalMachines > 0 && (
+              <Link
+                to="/machines"
+                className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+              >
+                Voir le parc <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={machinesByFamily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                  {machinesByFamily.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+
+          {kpis.totalMachines === 0 ? (
+            /* Empty State when Database is Purged */
+            <div className="py-7 px-4 bg-slate-50/70 border border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center mb-3">
+                <Printer className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-800">
+                Parc de machines prêt pour la production
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mt-1 mb-4">
+                La base a été purgée de toutes les données de test. Ajoutez vos vraies machines clientes (CIJ, Laser CO2, TTO, TIJ) pour afficher la répartition par technologie en temps réel.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <Link
+                  to="/machines?new=true"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-videojet-blue text-white text-xs font-bold hover:bg-slate-800 shadow-xs transition-colors"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  + Enregistrer une machine
+                </Link>
+                <Link
+                  to="/clients?new=true"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 shadow-xs transition-colors"
+                >
+                  <Building2 className="w-4 h-4" />
+                  + Créer un client
+                </Link>
+              </div>
+
+              {/* Technologies readiness preview */}
+              <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-6 pt-5 border-t border-slate-200/60">
+                <div className="p-2.5 rounded-lg bg-white border border-slate-100 text-left">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>CIJ Jet Continu</span>
+                    <span className="text-cyan-600 font-mono">0</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">Séries 1580 / 1880</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-slate-100 text-left">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>Laser CO2</span>
+                    <span className="text-amber-600 font-mono">0</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">Séries 3340 / 3640</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-slate-100 text-left">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>TTO Transfert</span>
+                    <span className="text-emerald-600 font-mono">0</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">DataFlex 6530</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-slate-100 text-left">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>TIJ Thermique</span>
+                    <span className="text-indigo-600 font-mono">0</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400">Wolke m610 touch</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Live Recharts Bar Chart when machines exist */
+            <div className="h-64 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
+                <BarChart data={machinesByFamily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {machinesByFamily.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Status Breakdown Mini Card */}
