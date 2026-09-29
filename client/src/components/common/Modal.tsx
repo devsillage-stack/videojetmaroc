@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { ErrorBoundary } from './ErrorBoundary.js';
 
 interface ModalProps {
   isOpen: boolean;
@@ -75,7 +76,11 @@ export const Modal: React.FC<ModalProps> = ({
             </button>
           </div>
 
-          <div className="mt-2">{children}</div>
+          <div className="mt-2">
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
     </div>

@@ -39,7 +39,7 @@ export const InvoicesPage: React.FC = () => {
     },
   });
 
-  const { data: invoiceDetails, isLoading: isInvoiceDetailsLoading } = useQuery({
+  const { data: invoiceDetails, isLoading: isInvoiceDetailsLoading, isError: isInvoiceDetailsError } = useQuery({
     queryKey: ['invoice-detail', previewInvoice?.id],
     queryFn: async () => {
       if (!previewInvoice?.id) return null;
@@ -200,7 +200,7 @@ export const InvoicesPage: React.FC = () => {
           isOpen={!!selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
           title={`Enregistrer un règlement : Facture ${selectedInvoice.invoiceNumber}`}
-          subtitle={`${selectedInvoice.client.name} — Reste à payer : ${formatPrice(selectedInvoice.totalTtc - selectedInvoice.paidAmount, selectedInvoice.currency)}`}
+          subtitle={`${selectedInvoice.client?.name || 'Client'} — Reste à payer : ${formatPrice(selectedInvoice.totalTtc - selectedInvoice.paidAmount, selectedInvoice.currency)}`}
           maxWidth="md"
         >
           <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs">
@@ -264,13 +264,17 @@ export const InvoicesPage: React.FC = () => {
       >
         {isInvoiceDetailsLoading ? (
           <div className="py-12 text-center text-slate-400">Chargement de la facture...</div>
+        ) : isInvoiceDetailsError ? (
+          <div className="py-12 text-center text-rose-500 font-medium">
+            Impossible de charger les détails de cette facture. Veuillez réessayer.
+          </div>
         ) : invoiceDetails ? (
           <div className="space-y-6 text-xs">
             {/* Header info */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
               <div>
                 <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Client Destinataire</p>
-                <p className="text-sm font-bold text-slate-800 mt-0.5">{invoiceDetails.client?.name}</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{invoiceDetails.client?.name || 'Client non spécifié'}</p>
                 <p className="text-xs text-slate-500">{invoiceDetails.client?.city || 'Maroc'}</p>
                 {invoiceDetails.quote && (
                   <p className="text-[11px] text-cyan-700 font-mono mt-1">Réf Devis : {invoiceDetails.quote.quoteNumber}</p>
@@ -282,10 +286,10 @@ export const InvoicesPage: React.FC = () => {
                   <StatusBadge status={invoiceDetails.status} />
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Émise le : {new Date(invoiceDetails.issueDate).toLocaleDateString('fr-FR')}
+                  Émise le : {invoiceDetails.issueDate ? new Date(invoiceDetails.issueDate).toLocaleDateString('fr-FR') : '—'}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Échéance : {new Date(invoiceDetails.dueDate).toLocaleDateString('fr-FR')}
+                  Échéance : {invoiceDetails.dueDate ? new Date(invoiceDetails.dueDate).toLocaleDateString('fr-FR') : '—'}
                 </p>
               </div>
               <div>
@@ -321,7 +325,7 @@ export const InvoicesPage: React.FC = () => {
                           {formatPrice(item.unitPrice, invoiceDetails.currency)}
                         </td>
                         <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                          {formatPrice(item.totalPrice, invoiceDetails.currency)}
+                          {formatPrice(item.totalLineHt ?? (item.quantity * item.unitPrice), invoiceDetails.currency)}
                         </td>
                       </tr>
                     ))}

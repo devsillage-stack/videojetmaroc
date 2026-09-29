@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext.js';
 import { CurrencyProvider } from './contexts/CurrencyContext.js';
 import { MainLayout } from './components/layout/MainLayout.js';
+import { ErrorBoundary } from './components/common/ErrorBoundary.js';
 import { Role } from './types/index.js';
 
 // Route-based Code Splitting (Lazy-loaded chunks for optimal bundle size)
@@ -56,7 +57,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white text-xs">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-          <span className="font-semibold tracking-wider">CHARGEMENT DE VIDEOJET MAROC...</span>
+          <span className="font-semibold tracking-wider">CHARGEMENT DE NEXORA INDUSTRIAL OS...</span>
         </div>
       </div>
     );
@@ -100,8 +101,9 @@ export const App: React.FC = () => {
       <AuthProvider>
         <CurrencyProvider>
           <BrowserRouter>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                 <Route path="/login" element={<LoginPage />} />
 
                 <Route
@@ -288,7 +290,8 @@ export const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-          </BrowserRouter>
+          </ErrorBoundary>
+        </BrowserRouter>
         </CurrencyProvider>
       </AuthProvider>
     </QueryClientProvider>

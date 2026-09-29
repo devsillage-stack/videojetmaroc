@@ -18,7 +18,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Audit & Diagnostic log for all API calls
+    const status = error.response?.status;
+    const url = error.config?.url;
+    const method = error.config?.method?.toUpperCase();
+    const errorData = error.response?.data?.error || error.response?.data?.message || error.message;
+
+    console.warn(`[NEXORA API ${method} ${url} HTTP ${status || 'ERR_CONN'}]:`, errorData);
+
+    if (status === 401) {
       localStorage.removeItem('vj_token');
       localStorage.removeItem('vj_user');
       if (window.location.pathname !== '/login') {

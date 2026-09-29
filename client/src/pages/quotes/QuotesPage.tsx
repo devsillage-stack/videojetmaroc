@@ -210,7 +210,7 @@ export const QuotesPage: React.FC = () => {
     },
   });
 
-  const { data: quoteDetails, isLoading: isQuoteDetailsLoading } = useQuery({
+  const { data: quoteDetails, isLoading: isQuoteDetailsLoading, isError: isQuoteDetailsError } = useQuery({
     queryKey: ['quote-detail', selectedQuote?.id],
     queryFn: async () => {
       if (!selectedQuote?.id) return null;
@@ -565,13 +565,17 @@ export const QuotesPage: React.FC = () => {
       >
         {isQuoteDetailsLoading ? (
           <div className="py-12 text-center text-slate-400">Chargement des détails du devis...</div>
+        ) : isQuoteDetailsError ? (
+          <div className="py-12 text-center text-rose-500 font-medium">
+            Impossible de charger les détails de ce devis. Veuillez réessayer.
+          </div>
         ) : quoteDetails ? (
           <div className="space-y-6">
             {/* Header info */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
               <div>
                 <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Client Destinataire</p>
-                <p className="text-sm font-bold text-slate-800 mt-0.5">{quoteDetails.client?.name}</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{quoteDetails.client?.name || 'Client non spécifié'}</p>
                 <p className="text-xs text-slate-500">{quoteDetails.client?.city || 'Maroc'}</p>
               </div>
               <div>
@@ -580,7 +584,7 @@ export const QuotesPage: React.FC = () => {
                   <StatusBadge status={quoteDetails.status} />
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Valide jusqu'au : {new Date(quoteDetails.validUntil).toLocaleDateString('fr-FR')}
+                  Valide jusqu'au : {quoteDetails.validUntil ? new Date(quoteDetails.validUntil).toLocaleDateString('fr-FR') : '—'}
                 </p>
               </div>
               <div>
@@ -622,7 +626,7 @@ export const QuotesPage: React.FC = () => {
                         {item.discountPercent ? `${item.discountPercent}%` : '—'}
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                        {formatPrice(item.totalPrice, quoteDetails.currency)}
+                        {formatPrice(item.totalLineHt ?? (item.quantity * item.unitPrice * (1 - (item.discountPercent || 0) / 100)), quoteDetails.currency)}
                       </td>
                     </tr>
                   ))}
@@ -634,16 +638,16 @@ export const QuotesPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 text-white p-4 rounded-xl">
               <div className="space-y-1 text-xs text-slate-400">
                 <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'DIRECTION']}>
-                  {quoteDetails.estimatedMargin !== undefined && (
+                  {quoteDetails.estimatedMargin !== undefined && quoteDetails.estimatedMargin !== null && (
                     <p>Marge prévisionnelle : <span className="text-emerald-400 font-bold">{formatPrice(quoteDetails.estimatedMargin, quoteDetails.currency)}</span></p>
                   )}
                 </PermissionGate>
                 <p>Émis par : {quoteDetails.createdBy ? `${quoteDetails.createdBy.firstName} ${quoteDetails.createdBy.lastName}` : 'NEXORA Commercial'}</p>
               </div>
               <div className="text-right space-y-1">
-                <p className="text-xs text-slate-400">Total HT : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.totalHt, quoteDetails.currency)}</span></p>
-                <p className="text-xs text-slate-400">TVA ({quoteDetails.taxRate?.rate || 20}%) : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.taxAmount, quoteDetails.currency)}</span></p>
-                <p className="text-base font-extrabold text-cyan-400">Total TTC : {formatPrice(quoteDetails.totalTtc, quoteDetails.currency)}</p>
+                <p className="text-xs text-slate-400">Total HT : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.totalHt ?? 0, quoteDetails.currency)}</span></p>
+                <p className="text-xs text-slate-400">TVA ({quoteDetails.taxRate?.rate || 20}%) : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.taxAmount ?? 0, quoteDetails.currency)}</span></p>
+                <p className="text-base font-extrabold text-cyan-400">Total TTC : {formatPrice(quoteDetails.totalTtc ?? 0, quoteDetails.currency)}</p>
               </div>
             </div>
 

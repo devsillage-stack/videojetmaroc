@@ -43,23 +43,35 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('vj_currency', code);
   };
 
-  const convertPrice = (amount: number, fromCurrency: string, toCurrency: string): number => {
-    if (fromCurrency === toCurrency) return amount;
-    const from = currencies.find((c) => c.code === fromCurrency) || { rateToBase: 1 };
-    const to = currencies.find((c) => c.code === toCurrency) || { rateToBase: 1 };
+  const convertPrice = (amount: number, fromCurrency: string = 'MAD', toCurrency: string = currentCurrency): number => {
+    const num = Number(amount);
+    const safeAmount = !isNaN(num) && isFinite(num) ? num : 0;
+    const safeFrom = fromCurrency || 'MAD';
+    const safeTo = toCurrency || currentCurrency || 'MAD';
+
+    if (safeFrom === safeTo) return safeAmount;
+    const from = currencies.find((c) => c.code === safeFrom) || { rateToBase: 1 };
+    const to = currencies.find((c) => c.code === safeTo) || { rateToBase: 1 };
+
+    const fromRate = from && typeof from.rateToBase === 'number' && from.rateToBase > 0 ? from.rateToBase : 1;
+    const toRate = to && typeof to.rateToBase === 'number' && to.rateToBase > 0 ? to.rateToBase : 1;
 
     // Convert to base (MAD) then to target
-    const inBase = amount * from.rateToBase;
-    const inTarget = inBase / to.rateToBase;
+    const inBase = safeAmount * fromRate;
+    const inTarget = inBase / toRate;
     return Math.round(inTarget * 100) / 100;
   };
 
   const formatPrice = (amount: number, fromCurrency: string = 'MAD'): string => {
-    const converted = convertPrice(amount, fromCurrency, currentCurrency);
+    const num = Number(amount);
+    const safeAmount = !isNaN(num) && isFinite(num) ? num : 0;
+    const converted = convertPrice(safeAmount, fromCurrency, currentCurrency);
     const curr = currencies.find((c) => c.code === currentCurrency);
-    const symbol = curr?.symbol || currentCurrency;
+    const symbol = curr?.symbol || currentCurrency || 'DH';
 
-    return `${converted.toLocaleString('fr-FR', {
+    const safeConverted = typeof converted === 'number' && !isNaN(converted) && isFinite(converted) ? converted : 0;
+
+    return `${safeConverted.toLocaleString('fr-FR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })} ${symbol}`;
