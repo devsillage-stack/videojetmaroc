@@ -4,6 +4,7 @@ import { PurchaseOrderStatus, StockMovementType, Role } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import { AuthRequest } from '../../types/index.js';
 import { logAuditAction } from '../../middlewares/audit.middleware.js';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 // SUPPLIERS
 const supplierSchema = z.object({
@@ -225,8 +226,7 @@ export const createPurchaseOrder = async (req: AuthRequest, res: Response): Prom
     return;
   }
 
-  const count = await prisma.purchaseOrder.count();
-  const orderNumber = `ACH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+  const orderNumber = await getNextSequenceNumber('purchaseOrder');
 
   let subtotalHt = 0;
   const itemsData = data.items.map((item) => {
@@ -329,91 +329,92 @@ export const receivePurchaseOrder = async (req: AuthRequest, res: Response): Pro
     return;
   }
 
-  for (const reception of data.receivedItems) {
-    const item = order.items.find((i) => i.id === reception.itemId);
-    if (!item) continue;
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    for (const reception of data.receivedItems) {
+      const item = order.items.find((i) => i.id === reception.itemId);
+      if (!item) continue;
 
-    // Update item received quantity
-    const newReceivedQty = item.receivedQuantity + reception.receivedQuantity;
-    await prisma.purchaseOrderItem.update({
-      where: { id: item.id },
-      data: { receivedQuantity: newReceivedQty },
-    });
+      // Update item received quantity
+      const newReceivedQty = item.receivedQuantity + reception.receivedQuantity;
+      await tx.purchaseOrderItem.update({
+        where: { id: item.id },
+        data: { receivedQuantity: newReceivedQty },
+      });
 
-    // Create batch if batchNumber provided
-    let batchId: string | null = null;
-    if (reception.batchNumber && reception.expirationDate) {
-      const expDate = new Date(reception.expirationDate);
-      const batch = await prisma.stockBatch.create({
+      // Create batch if batchNumber provided
+      let batchId: string | null = null;
+      if (reception.batchNumber && reception.expirationDate) {
+        const expDate = new Date(reception.expirationDate);
+        const batch = await tx.stockBatch.create({
+          data: {
+            productId: item.productId,
+            batchNumber: reception.batchNumber,
+            expirationDate: expDate,
+            quantity: reception.receivedQuantity,
+            warehouseLocation: reception.warehouseLocation || null,
+          },
+        });
+        batchId = batch.id;
+      }
+
+      // Increment product stock
+      const productBefore = item.product.stockQuantity;
+      const productAfter = productBefore + reception.receivedQuantity;
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stockQuantity: { increment: reception.receivedQuantity } },
+      });
+
+      // Create StockMovement
+      const movementNumber = await getNextSequenceNumber('stockMovement', undefined, tx);
+
+      await tx.stockMovement.create({
         data: {
+          movementNumber,
           productId: item.productId,
-          batchNumber: reception.batchNumber,
-          expirationDate: expDate,
+          batchId,
+          purchaseOrderId: order.id,
+          userId: userId || null,
+          type: StockMovementType.ENTREE_ACHAT,
           quantity: reception.receivedQuantity,
-          warehouseLocation: reception.warehouseLocation || null,
+          stockBefore: productBefore,
+          stockAfter: productAfter,
+          reason: `Réception bon de commande fournisseur ${order.orderNumber}`,
         },
       });
-      batchId = batch.id;
     }
 
-    // Increment product stock
-    const productBefore = item.product.stockQuantity;
-    const productAfter = productBefore + reception.receivedQuantity;
-
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: { stockQuantity: { increment: reception.receivedQuantity } },
+    // Check if fully received
+    const updatedItems = await tx.purchaseOrderItem.findMany({
+      where: { purchaseOrderId: id },
     });
 
-    // Create StockMovement
-    const movementCount = await prisma.stockMovement.count();
-    const movementNumber = `MVT-${new Date().getFullYear()}-${String(movementCount + 1).padStart(4, '0')}`;
+    const allComplete = updatedItems.every((i) => i.receivedQuantity >= i.quantity);
+    const newStatus = allComplete ? PurchaseOrderStatus.RECUE_COMPLETE : PurchaseOrderStatus.RECUE_PARTIELLE;
 
-    await prisma.stockMovement.create({
+    return await tx.purchaseOrder.update({
+      where: { id },
       data: {
-        movementNumber,
-        productId: item.productId,
-        batchId,
-        purchaseOrderId: order.id,
-        userId: userId || null,
-        type: StockMovementType.ENTREE_ACHAT,
-        quantity: reception.receivedQuantity,
-        stockBefore: productBefore,
-        stockAfter: productAfter,
-        reason: `Réception bon de commande fournisseur ${order.orderNumber}`,
+        status: newStatus,
+        receivedDate: new Date(data.receivedDate || new Date()),
+      },
+      include: {
+        supplier: true,
+        items: { include: { product: true } },
+        stockMovements: true,
       },
     });
-  }
-
-  // Check if fully received
-  const updatedItems = await prisma.purchaseOrderItem.findMany({
-    where: { purchaseOrderId: id },
-  });
-
-  const allComplete = updatedItems.every((i) => i.receivedQuantity >= i.quantity);
-  const newStatus = allComplete ? PurchaseOrderStatus.RECUE_COMPLETE : PurchaseOrderStatus.RECUE_PARTIELLE;
-
-  const updatedOrder = await prisma.purchaseOrder.update({
-    where: { id },
-    data: {
-      status: newStatus,
-      receivedDate: new Date(data.receivedDate || new Date()),
-    },
-    include: {
-      supplier: true,
-      items: { include: { product: true } },
-      stockMovements: true,
-    },
   });
 
   await logAuditAction(req, 'RECEIVE_ORDER', 'PurchaseOrder', id, {
-    newStatus,
+    newStatus: updatedOrder.status,
     receivedCount: data.receivedItems.length,
   });
 
   res.json({
     purchaseOrder: updatedOrder,
-    message: allComplete
+    message: updatedOrder.status === PurchaseOrderStatus.RECUE_COMPLETE
       ? 'Commande entièrement réceptionnée et stock mis à jour'
       : 'Réception partielle enregistrée et stock mis à jour',
   });

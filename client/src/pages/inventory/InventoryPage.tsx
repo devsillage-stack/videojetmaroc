@@ -13,6 +13,7 @@ import {
   MapPin,
   CheckCircle,
   FileSpreadsheet,
+  RotateCcw,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import { Product, StockBatch } from '../../types/index.js';
@@ -149,7 +150,14 @@ export const InventoryPage: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl shadow-xs transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Exporter Catalogue Excel
+            Catalogue Excel
+          </button>
+          <button
+            onClick={() => downloadExport('/exports/movements/excel', 'Mouvements_Stock_Audit.xlsx')}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 rounded-xl shadow-xs transition-colors"
+          >
+            <Layers className="w-4 h-4 text-blue-600" />
+            Mouvements Excel
           </button>
           <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'MAGASINIER']}>
             <button
@@ -232,7 +240,7 @@ export const InventoryPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <select
                 value={selectedTech}
                 onChange={(e) => setSelectedTech(e.target.value)}
@@ -254,6 +262,25 @@ export const InventoryPage: React.FC = () => {
                 />
                 Stock bas uniquement
               </label>
+
+              {(search || selectedTech || lowStockOnly) && (
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    setSelectedTech('');
+                    setLowStockOnly(false);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 transition-colors"
+                  title="Réinitialiser les filtres"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Effacer</span>
+                </button>
+              )}
+
+              <div className="text-[11px] font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">
+                {products ? products.length : 0} article(s)
+              </div>
             </div>
           </div>
 

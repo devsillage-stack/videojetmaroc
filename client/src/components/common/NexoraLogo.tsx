@@ -134,11 +134,11 @@ export const NexoraLogo: React.FC<NexoraLogoProps> = ({
           </div>
           <span
             className={`font-semibold tracking-widest uppercase ${sub} ${
-              variant === 'light' ? 'text-slate-500' : 'text-cyan-300/80'
+              variant === 'light' ? 'text-slate-500' : 'text-cyan-300/90'
             }`}
-            style={{ letterSpacing: '0.18em' }}
+            style={{ letterSpacing: '0.14em' }}
           >
-            Industrial Operating System
+            Videojet Maroc · Industrial OS
           </span>
         </div>
       )}

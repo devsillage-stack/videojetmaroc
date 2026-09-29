@@ -10,6 +10,7 @@ import {
 import prisma from '../../config/prisma.js';
 import { AuthRequest } from '../../types/index.js';
 import { logAuditAction } from '../../middlewares/audit.middleware.js';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 const ticketSchema = z.object({
   machineId: z.string().uuid(),
@@ -121,8 +122,7 @@ export const getTicketById = async (req: AuthRequest, res: Response): Promise<vo
 export const createTicket = async (req: AuthRequest, res: Response): Promise<void> => {
   const data = ticketSchema.parse(req.body);
 
-  const count = await prisma.maintenanceTicket.count();
-  const ticketNumber = `TCK-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+  const ticketNumber = await getNextSequenceNumber('ticket');
 
   const now = new Date();
   let slaResponseHours = 4;
@@ -288,8 +288,7 @@ export const getInterventionById = async (req: AuthRequest, res: Response): Prom
 export const createIntervention = async (req: AuthRequest, res: Response): Promise<void> => {
   const data = interventionSchema.parse(req.body);
 
-  const count = await prisma.intervention.count();
-  const interventionNumber = `INT-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+  const interventionNumber = await getNextSequenceNumber('intervention');
 
   const intervention = await prisma.intervention.create({
     data: {
@@ -358,121 +357,124 @@ export const completeIntervention = async (req: AuthRequest, res: Response): Pro
     return;
   }
 
-  // Update machine meters and operational status
-  const machineUpdate: any = {
-    status: MachineStatus.OPERATIONNELLE,
-  };
-  if (data.meterReadingHours !== undefined && data.meterReadingHours !== null) {
-    machineUpdate.totalOperatingHours = data.meterReadingHours;
-  }
-  if (data.meterReadingPrints !== undefined && data.meterReadingPrints !== null) {
-    machineUpdate.totalPrintsCount = BigInt(data.meterReadingPrints);
-  }
+  const completed = await prisma.$transaction(async (tx) => {
+    // 1. Update machine meters and operational status
+    const machineUpdate: any = {
+      status: MachineStatus.OPERATIONNELLE,
+    };
+    if (data.meterReadingHours !== undefined && data.meterReadingHours !== null) {
+      machineUpdate.totalOperatingHours = data.meterReadingHours;
+    }
+    if (data.meterReadingPrints !== undefined && data.meterReadingPrints !== null) {
+      machineUpdate.totalPrintsCount = BigInt(data.meterReadingPrints);
+    }
 
-  await prisma.machine.update({
-    where: { id: existing.machineId },
-    data: machineUpdate,
-  });
+    await tx.machine.update({
+      where: { id: existing.machineId },
+      data: machineUpdate,
+    });
 
-  // Handle spare parts consumption and stock decrements
-  if (data.partsUsed && data.partsUsed.length > 0) {
-    for (const part of data.partsUsed) {
-      const product = await prisma.product.findUnique({
-        where: { id: part.productId },
-      });
-
-      if (product) {
-        await prisma.interventionPartUsed.create({
-          data: {
-            interventionId: id,
-            productId: part.productId,
-            batchId: part.batchId || null,
-            quantity: part.quantity,
-            unitPrice: product.unitPrice,
-          },
-        });
-
-        // Decrement product stock
-        await prisma.product.update({
+    // 2. Handle spare parts consumption and stock decrements
+    if (data.partsUsed && data.partsUsed.length > 0) {
+      for (const part of data.partsUsed) {
+        const product = await tx.product.findUnique({
           where: { id: part.productId },
-          data: {
-            stockQuantity: {
-              decrement: part.quantity,
-            },
-          },
         });
 
-        // If batch provided, decrement batch quantity
-        if (part.batchId) {
-          await prisma.stockBatch.update({
-            where: { id: part.batchId },
+        if (product) {
+          await tx.interventionPartUsed.create({
             data: {
-              quantity: {
+              interventionId: id,
+              productId: part.productId,
+              batchId: part.batchId || null,
+              quantity: part.quantity,
+              unitPrice: product.unitPrice,
+            },
+          });
+
+          // Decrement product stock
+          await tx.product.update({
+            where: { id: part.productId },
+            data: {
+              stockQuantity: {
                 decrement: part.quantity,
               },
             },
           });
-        }
 
-        // Traceability stock movement
-        const movementCount = await prisma.stockMovement.count();
-        const movementNumber = `MVT-${new Date().getFullYear()}-${String(movementCount + 1).padStart(4, '0')}`;
-        await prisma.stockMovement.create({
-          data: {
-            movementNumber,
-            productId: part.productId,
-            batchId: part.batchId || null,
-            userId: req.user?.userId || null,
-            type: 'SORTIE_INTERVENTION',
-            quantity: -part.quantity,
-            stockBefore: product.stockQuantity,
-            stockAfter: product.stockQuantity - part.quantity,
-            reason: `Pièce utilisée pour intervention ${existing.interventionNumber}`,
-          },
-        });
+          // If batch provided, decrement batch quantity
+          if (part.batchId) {
+            await tx.stockBatch.update({
+              where: { id: part.batchId },
+              data: {
+                quantity: {
+                  decrement: part.quantity,
+                },
+              },
+            });
+          }
+
+          // Traceability stock movement
+          const movementNumber = await getNextSequenceNumber('stockMovement', undefined, tx);
+          await tx.stockMovement.create({
+            data: {
+              movementNumber,
+              productId: part.productId,
+              batchId: part.batchId || null,
+              userId: req.user?.userId || null,
+              type: 'SORTIE_INTERVENTION',
+              quantity: -part.quantity,
+              stockBefore: product.stockQuantity,
+              stockAfter: product.stockQuantity - part.quantity,
+              reason: `Pièce utilisée pour intervention ${existing.interventionNumber}`,
+            },
+          });
+        }
       }
     }
-  }
 
-  // Update intervention as completed
-  const completed = await prisma.intervention.update({
-    where: { id },
-    data: {
-      status: InterventionStatus.TERMINEE,
-      completedAt: new Date(),
-      hoursSpent: data.hoursSpent,
-      travelHours: data.travelHours || 0.0,
-      travelDistanceKm: data.travelDistanceKm || 0.0,
-      travelExpenses: data.travelExpenses || 0.0,
-      meterReadingHours: data.meterReadingHours || null,
-      meterReadingPrints: data.meterReadingPrints ? BigInt(data.meterReadingPrints) : null,
-      diagnosis: data.diagnosis,
-      workDone: data.workDone,
-      customerFeedback: data.customerFeedback || null,
-      customerSignature: data.customerSignature || null,
-      customerSignerName: data.customerSignerName,
-      customerSignerTitle: data.customerSignerTitle || null,
-    },
-    include: {
-      partsUsed: { include: { product: true } },
-      technician: true,
-      client: true,
-      machine: { include: { model: true } },
-    },
-  });
-
-  // If linked to a ticket, resolve the ticket
-  if (existing.ticketId) {
-    const existingTicket = await prisma.maintenanceTicket.findUnique({ where: { id: existing.ticketId } });
-    await prisma.maintenanceTicket.update({
-      where: { id: existing.ticketId },
+    // 3. Update intervention as completed
+    const updatedIntervention = await tx.intervention.update({
+      where: { id },
       data: {
-        status: TicketStatus.RESOLU,
-        resolvedAt: existingTicket?.resolvedAt || new Date(),
-        resolutionNotes: `Résolu lors de l'intervention ${existing.interventionNumber} par ${(completed as any).technician?.firstName || ''} ${(completed as any).technician?.lastName || ''}. Travaux effectués: ${data.workDone}`,
+        status: InterventionStatus.TERMINEE,
+        completedAt: new Date(),
+        hoursSpent: data.hoursSpent,
+        travelHours: data.travelHours || 0.0,
+        travelDistanceKm: data.travelDistanceKm || 0.0,
+        travelExpenses: data.travelExpenses || 0.0,
+        meterReadingHours: data.meterReadingHours || null,
+        meterReadingPrints: data.meterReadingPrints ? BigInt(data.meterReadingPrints) : null,
+        diagnosis: data.diagnosis,
+        workDone: data.workDone,
+        customerFeedback: data.customerFeedback || null,
+        customerSignature: data.customerSignature || null,
+        customerSignerName: data.customerSignerName,
+        customerSignerTitle: data.customerSignerTitle || null,
+      },
+      include: {
+        partsUsed: { include: { product: true } },
+        technician: true,
+        client: true,
+        machine: { include: { model: true } },
       },
     });
-  }
+
+    // 4. If linked to a ticket, resolve the ticket
+    if (existing.ticketId) {
+      const existingTicket = await tx.maintenanceTicket.findUnique({ where: { id: existing.ticketId } });
+      await tx.maintenanceTicket.update({
+        where: { id: existing.ticketId },
+        data: {
+          status: TicketStatus.RESOLU,
+          resolvedAt: existingTicket?.resolvedAt || new Date(),
+          resolutionNotes: `Résolu lors de l'intervention ${existing.interventionNumber} par ${(updatedIntervention as any).technician?.firstName || ''} ${(updatedIntervention as any).technician?.lastName || ''}. Travaux effectués: ${data.workDone}`,
+        },
+      });
+    }
+
+    return updatedIntervention;
+  });
 
   await logAuditAction(req, 'COMPLETE', 'Intervention', completed.id, {
     hoursSpent: data.hoursSpent,

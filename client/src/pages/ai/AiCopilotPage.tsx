@@ -29,7 +29,7 @@ export const AiCopilotPage: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: `👋 Bonjour ! Je suis le **Copilot IA Industriel NEXORA**.\n\nJe suis entraîné sur l'ensemble des manuels techniques constructeur, la chimie des encres et les données terrain industrielles.\n\nComment puis-je vous assister aujourd'hui ?`,
+      content: `👋 Bonjour ! Je suis le **Copilote IA Industriel Videojet Maroc (NEXORA OS)**.\n\nJe suis entraîné sur les manuels constructeur Videojet, la chimie des encres certifiées, les procédures CleanFlow™, le diagnostic de pannes et l'intelligence concurrentielle.\n\nComment puis-je vous assister aujourd'hui ?`,
     },
   ]);
   const [chatInput, setChatInput] = useState('');

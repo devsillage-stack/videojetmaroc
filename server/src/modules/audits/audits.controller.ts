@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../../config/prisma.js';
 import { generateTechnicalRecommendation } from './recommendation.engine.js';
 import { AuditStatus } from '@prisma/client';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 export class AuditsController {
   // GET /api/audits
@@ -98,8 +99,7 @@ export class AuditsController {
       return;
     }
 
-    const count = await prisma.industrialAudit.count();
-    const auditNumber = `AUD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const auditNumber = await getNextSequenceNumber('industrialAudit');
 
     // Auto generate recommendation
     const recResult = generateTechnicalRecommendation({
@@ -208,8 +208,7 @@ export class AuditsController {
       return;
     }
 
-    const count = await prisma.tcoCalculation.count();
-    const calculationNumber = `TCO-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const calculationNumber = await getNextSequenceNumber('tcoCalculation');
 
     const existingDowntimeLosses = Number(existingAnnualDowntimeHours) * Number(hourlyDowntimeCost);
     const totalExistingAnnualCost =

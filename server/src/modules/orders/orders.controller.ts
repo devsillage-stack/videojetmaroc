@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/prisma.js';
 import { OrderStatus, QuoteStatus } from '@prisma/client';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 export class OrdersController {
   // GET /api/orders
@@ -70,8 +71,7 @@ export class OrdersController {
       items = [],
     } = req.body;
 
-    const count = await prisma.order.count();
-    const orderNumber = `CMD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const orderNumber = await getNextSequenceNumber('order');
 
     // If converted from quote
     let finalClientId = clientId;

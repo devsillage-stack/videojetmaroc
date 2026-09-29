@@ -16,6 +16,8 @@ import {
   Printer,
   Package,
   FileDown,
+  RotateCcw,
+  Filter,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import {
@@ -137,6 +139,16 @@ export const MaintenancePage: React.FC = () => {
     partsUsed: [] as { productId: string; quantity: number }[],
   });
 
+  // Filter States
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPriority, setTicketPriority] = useState('');
+  const [ticketStatus, setTicketStatus] = useState('');
+  const [ticketClient, setTicketClient] = useState('');
+
+  const [interventionSearch, setInterventionSearch] = useState('');
+  const [interventionStatus, setInterventionStatus] = useState('');
+  const [interventionType, setInterventionType] = useState('');
+
   // Queries
   const { data: tickets, isLoading: isTicketsLoading } = useQuery({
     queryKey: ['tickets'],
@@ -184,6 +196,38 @@ export const MaintenancePage: React.FC = () => {
       const res = await api.get('/inventory/products');
       return res.data.products as Product[];
     },
+  });
+
+  // Filtered computations
+  const filteredTickets = (tickets || []).filter((tk) => {
+    if (ticketPriority && tk.priority !== ticketPriority) return false;
+    if (ticketStatus && tk.status !== ticketStatus) return false;
+    if (ticketClient && tk.clientId !== ticketClient) return false;
+    if (ticketSearch) {
+      const q = ticketSearch.toLowerCase();
+      const matchNum = tk.ticketNumber?.toLowerCase().includes(q);
+      const matchClient = tk.client?.name?.toLowerCase().includes(q);
+      const matchSn = tk.machine?.serialNumber?.toLowerCase().includes(q);
+      const matchModel = tk.machine?.model?.name?.toLowerCase().includes(q);
+      const matchDesc = tk.faultDescription?.toLowerCase().includes(q);
+      const matchErr = tk.errorCode?.toLowerCase().includes(q);
+      if (!matchNum && !matchClient && !matchSn && !matchModel && !matchDesc && !matchErr) return false;
+    }
+    return true;
+  });
+
+  const filteredInterventions = (interventions || []).filter((inv) => {
+    if (interventionStatus && inv.status !== interventionStatus) return false;
+    if (interventionType && inv.type !== interventionType) return false;
+    if (interventionSearch) {
+      const q = interventionSearch.toLowerCase();
+      const matchNum = inv.interventionNumber?.toLowerCase().includes(q);
+      const matchClient = inv.client?.name?.toLowerCase().includes(q);
+      const matchSn = inv.machine?.serialNumber?.toLowerCase().includes(q);
+      const matchTech = `${inv.technician?.firstName || ''} ${inv.technician?.lastName || ''}`.toLowerCase().includes(q);
+      if (!matchNum && !matchClient && !matchSn && !matchTech) return false;
+    }
+    return true;
   });
 
   // Mutations
@@ -361,180 +405,322 @@ export const MaintenancePage: React.FC = () => {
 
       {/* TAB 1: TICKETS */}
       {activeTab === 'tickets' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
-                <tr>
-                  <th className="py-3 px-4">{t('maintenance.ticketNumber')}</th>
-                  <th className="py-3 px-4">Client Industriel</th>
-                  <th className="py-3 px-4">Machine & Modèle</th>
-                  <th className="py-3 px-4">Description de la panne</th>
-                  <th className="py-3 px-4">Code Erreur</th>
-                  <th className="py-3 px-4">{t('maintenance.priority')}</th>
-                  <th className="py-3 px-4">Échéance SLA</th>
-                  <th className="py-3 px-4">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isTicketsLoading ? (
+        <div className="space-y-4">
+          {/* Ticket Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={ticketSearch}
+                onChange={(e) => setTicketSearch(e.target.value)}
+                placeholder="Rechercher par N° Ticket, Client, Machine, Code Erreur..."
+                className="w-full pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <select
+                value={ticketClient}
+                onChange={(e) => setTicketClient(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 max-w-[160px]"
+              >
+                <option value="">Tous clients</option>
+                {clients?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={ticketPriority}
+                onChange={(e) => setTicketPriority(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Toutes priorités</option>
+                <option value="CRITIQUE_LIGNE_ARRETEE">Critique (Ligne Arrêtée)</option>
+                <option value="HAUTE">Haute</option>
+                <option value="NORMALE">Normale</option>
+                <option value="BASSE">Basse</option>
+              </select>
+
+              <select
+                value={ticketStatus}
+                onChange={(e) => setTicketStatus(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Tous statuts</option>
+                <option value="OUVERT">Ouvert</option>
+                <option value="ASSIGNE">Assigné</option>
+                <option value="EN_COURS">En Cours</option>
+                <option value="RESOLU">Résolu</option>
+                <option value="CLOTURE">Clôturé</option>
+              </select>
+
+              {(ticketSearch || ticketPriority || ticketStatus || ticketClient) && (
+                <button
+                  onClick={() => {
+                    setTicketSearch('');
+                    setTicketPriority('');
+                    setTicketStatus('');
+                    setTicketClient('');
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 transition-colors"
+                  title="Réinitialiser les filtres"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Effacer</span>
+                </button>
+              )}
+
+              <div className="text-[11px] font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">
+                {filteredTickets.length} ticket(s)
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      Chargement des tickets...
-                    </td>
+                    <th className="py-3 px-4">{t('maintenance.ticketNumber')}</th>
+                    <th className="py-3 px-4">Client Industriel</th>
+                    <th className="py-3 px-4">Machine & Modèle</th>
+                    <th className="py-3 px-4">Description de la panne</th>
+                    <th className="py-3 px-4">Code Erreur</th>
+                    <th className="py-3 px-4">{t('maintenance.priority')}</th>
+                    <th className="py-3 px-4">Échéance SLA</th>
+                    <th className="py-3 px-4">Statut</th>
                   </tr>
-                ) : tickets && tickets.length > 0 ? (
-                  tickets.map((tk) => (
-                    <tr key={tk.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">{tk.ticketNumber}</td>
-                      <td className="py-3 px-4 font-medium text-slate-800">{tk.client?.name}</td>
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-900">{tk.machine?.serialNumber}</span>
-                        <span className="block text-[10px] text-slate-500">{tk.machine?.model?.name}</span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-700 max-w-xs truncate">
-                        {tk.faultDescription}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-rose-600 font-semibold">
-                        {tk.errorCode || '—'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={tk.priority} />
-                      </td>
-                      <td className="py-3 px-4">
-                        <SlaBadge
-                          target={tk.slaTargetResolutionAt}
-                          status={tk.status}
-                          resolvedAt={tk.resolvedAt}
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={tk.status} />
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isTicketsLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        Chargement des tickets...
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      Aucun incident en cours. Tout le parc est opérationnel.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  ) : filteredTickets.length > 0 ? (
+                    filteredTickets.map((tk) => (
+                      <tr key={tk.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">{tk.ticketNumber}</td>
+                        <td className="py-3 px-4 font-medium text-slate-800">{tk.client?.name}</td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-slate-900">{tk.machine?.serialNumber}</span>
+                          <span className="block text-[10px] text-slate-500">{tk.machine?.model?.name}</span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-700 max-w-xs truncate">
+                          {tk.faultDescription}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-rose-600 font-semibold">
+                          {tk.errorCode || '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusBadge status={tk.priority} />
+                        </td>
+                        <td className="py-3 px-4">
+                          <SlaBadge
+                            target={tk.slaTargetResolutionAt}
+                            status={tk.status}
+                            resolvedAt={tk.resolvedAt}
+                          />
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusBadge status={tk.status} />
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        {tickets && tickets.length > 0
+                          ? 'Aucun ticket ne correspond à vos filtres de recherche.'
+                          : 'Aucun incident en cours. Tout le parc est opérationnel.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
       {/* TAB 2: INTERVENTIONS */}
       {activeTab === 'interventions' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
-                <tr>
-                  <th className="py-3 px-4">{t('maintenance.interventionNumber')}</th>
-                  <th className="py-3 px-4">Client & Ligne</th>
-                  <th className="py-3 px-4">Machine</th>
-                  <th className="py-3 px-4">{t('maintenance.technician')}</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">{t('maintenance.scheduledDate')}</th>
-                  <th className="py-3 px-4">Statut</th>
-                  <th className="py-3 px-4 text-right">Actions Fiche SAV</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isInterventionsLoading ? (
+        <div className="space-y-4">
+          {/* Intervention Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={interventionSearch}
+                onChange={(e) => setInterventionSearch(e.target.value)}
+                placeholder="Rechercher par N° Intervention, Client, Machine ou Technicien..."
+                className="w-full pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <select
+                value={interventionType}
+                onChange={(e) => setInterventionType(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Tous types</option>
+                <option value="CURATIVE">Curative (Dépannage)</option>
+                <option value="PREVENTIVE">Préventive</option>
+                <option value="INSTALLATION">Installation</option>
+                <option value="FORMATION">Formation</option>
+                <option value="AUDIT">Audit Technique</option>
+              </select>
+
+              <select
+                value={interventionStatus}
+                onChange={(e) => setInterventionStatus(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Tous statuts</option>
+                <option value="PLANIFIEE">Planifiée</option>
+                <option value="EN_COURS">En cours</option>
+                <option value="TERMINEE">Terminée</option>
+                <option value="ANNULEE">Annulée</option>
+              </select>
+
+              {(interventionSearch || interventionType || interventionStatus) && (
+                <button
+                  onClick={() => {
+                    setInterventionSearch('');
+                    setInterventionType('');
+                    setInterventionStatus('');
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 transition-colors"
+                  title="Réinitialiser les filtres"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Effacer</span>
+                </button>
+              )}
+
+              <div className="text-[11px] font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">
+                {filteredInterventions.length} intervention(s)
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      Chargement des interventions...
-                    </td>
+                    <th className="py-3 px-4">{t('maintenance.interventionNumber')}</th>
+                    <th className="py-3 px-4">Client & Ligne</th>
+                    <th className="py-3 px-4">Machine</th>
+                    <th className="py-3 px-4">{t('maintenance.technician')}</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">{t('maintenance.scheduledDate')}</th>
+                    <th className="py-3 px-4">Statut</th>
+                    <th className="py-3 px-4 text-right">Actions Fiche SAV</th>
                   </tr>
-                ) : interventions && interventions.length > 0 ? (
-                  interventions.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">{inv.interventionNumber}</td>
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-800">{inv.client.name}</span>
-                        <span className="block text-[10px] text-slate-500">{inv.client.city}</span>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-medium">{inv.machine.serialNumber}</td>
-                      <td className="py-3 px-4 font-medium text-slate-700">
-                        {inv.technician.firstName} {inv.technician.lastName}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                          {inv.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">
-                        {new Date(inv.scheduledDate).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={inv.status} />
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => downloadExport(`/exports/interventions/${inv.id}/pdf`, `Fiche_SAV_${inv.interventionNumber}.pdf`)}
-                            title="Télécharger la fiche d'intervention (PDF)"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs transition-colors"
-                          >
-                            <FileDown className="w-3.5 h-3.5 text-videojet-blue" />
-                            PDF
-                          </button>
-                          {inv.status === 'PLANIFIEE' && (
-                            <button
-                              onClick={() => startInterventionMutation.mutate(inv.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold text-xs transition-colors"
-                            >
-                              <Play className="w-3.5 h-3.5" />
-                              {t('maintenance.start')}
-                            </button>
-                          )}
-                          {inv.status === 'EN_COURS' && (
-                            <button
-                              onClick={() => {
-                                setCompleteInterventionTarget(inv);
-                                setCompletionForm({
-                                  hoursSpent: 2.0,
-                                  travelHours: 1.0,
-                                  travelDistanceKm: 50,
-                                  travelExpenses: 150,
-                                  diagnosis: inv.diagnosis || '',
-                                  workDone: inv.workDone || '',
-                                  customerFeedback: '',
-                                  customerSignerName: '',
-                                  customerSignerTitle: '',
-                                  customerSignature: '',
-                                  partsUsed: [],
-                                });
-                              }}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs transition-colors shadow-xs"
-                            >
-                              <FileSignature className="w-3.5 h-3.5" />
-                              {t('maintenance.signAndClose')}
-                            </button>
-                          )}
-                          {inv.status === 'TERMINEE' && (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-xs">
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              Signé : {inv.customerSignerName || 'Client'}
-                            </span>
-                          )}
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isInterventionsLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        Chargement des interventions...
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      Aucune intervention enregistrée.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  ) : filteredInterventions.length > 0 ? (
+                    filteredInterventions.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">{inv.interventionNumber}</td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-slate-800">{inv.client.name}</span>
+                          <span className="block text-[10px] text-slate-500">{inv.client.city}</span>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-medium">{inv.machine.serialNumber}</td>
+                        <td className="py-3 px-4 font-medium text-slate-700">
+                          {inv.technician.firstName} {inv.technician.lastName}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {inv.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {new Date(inv.scheduledDate).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusBadge status={inv.status} />
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => downloadExport(`/exports/interventions/${inv.id}/pdf`, `Fiche_SAV_${inv.interventionNumber}.pdf`)}
+                              title="Télécharger la fiche d'intervention (PDF)"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs transition-colors"
+                            >
+                              <FileDown className="w-3.5 h-3.5 text-videojet-blue" />
+                              PDF
+                            </button>
+                            {inv.status === 'PLANIFIEE' && (
+                              <button
+                                onClick={() => startInterventionMutation.mutate(inv.id)}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold text-xs transition-colors"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                {t('maintenance.start')}
+                              </button>
+                            )}
+                            {inv.status === 'EN_COURS' && (
+                              <button
+                                onClick={() => {
+                                  setCompleteInterventionTarget(inv);
+                                  setCompletionForm({
+                                    hoursSpent: 2.0,
+                                    travelHours: 1.0,
+                                    travelDistanceKm: 50,
+                                    travelExpenses: 150,
+                                    diagnosis: inv.diagnosis || '',
+                                    workDone: inv.workDone || '',
+                                    customerFeedback: '',
+                                    customerSignerName: '',
+                                    customerSignerTitle: '',
+                                    customerSignature: '',
+                                    partsUsed: [],
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs transition-colors shadow-xs"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                {t('maintenance.signAndClose')}
+                              </button>
+                            )}
+                            {inv.status === 'TERMINEE' && (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-xs">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Signé : {inv.customerSignerName || 'Client'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        {interventions && interventions.length > 0
+                          ? 'Aucune intervention ne correspond à vos filtres de recherche.'
+                          : 'Aucune intervention enregistrée.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

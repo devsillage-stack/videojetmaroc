@@ -4,11 +4,12 @@ import { QuoteStatus, Role } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import { AuthRequest } from '../../types/index.js';
 import { logAuditAction } from '../../middlewares/audit.middleware.js';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 const quoteItemSchema = z.object({
   itemType: z.enum(['MACHINE', 'PRODUCT', 'SERVICE', 'CONTRAT']),
-  machineModelId: z.string().uuid().optional().nullable(),
-  productId: z.string().uuid().optional().nullable(),
+  machineModelId: z.string().optional().nullable().or(z.literal('')),
+  productId: z.string().optional().nullable().or(z.literal('')),
   description: z.string().min(2),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
@@ -18,8 +19,8 @@ const quoteItemSchema = z.object({
 
 const quoteSchema = z.object({
   clientId: z.string().uuid(),
-  opportunityId: z.string().uuid().optional().nullable(),
-  taxRateId: z.string().uuid(),
+  opportunityId: z.string().uuid().optional().nullable().or(z.literal('')),
+  taxRateId: z.string().min(1, 'Taux de TVA requis'),
   currency: z.string().default('MAD'),
   exchangeRate: z.number().positive().default(1.0),
   discountPercent: z.number().min(0).max(100).default(0),
@@ -113,8 +114,7 @@ export const getQuoteById = async (req: AuthRequest, res: Response): Promise<voi
 export const createQuote = async (req: AuthRequest, res: Response): Promise<void> => {
   const data = quoteSchema.parse(req.body);
 
-  const count = await prisma.quote.count();
-  const quoteNumber = `DEV-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+  const quoteNumber = await getNextSequenceNumber('quote');
 
   const tax = await prisma.taxRate.findUnique({
     where: { id: data.taxRateId },
@@ -221,33 +221,36 @@ export const convertQuoteToInvoice = async (req: AuthRequest, res: Response): Pr
     return;
   }
 
-  const count = await prisma.invoice.count();
-  const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+  const invoiceNumber = await getNextSequenceNumber('invoice');
 
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 30); // 30 days credit
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      invoiceNumber,
-      quoteId: quote.id,
-      clientId: quote.clientId,
-      issueDate: new Date(),
-      dueDate,
-      currency: quote.currency,
-      exchangeRate: quote.exchangeRate,
-      subtotalHt: quote.totalHt,
-      taxAmount: quote.taxAmount,
-      totalTtc: quote.totalTtc,
-      paidAmount: 0,
-      notes: `Généré automatiquement depuis le devis ${quote.quoteNumber}`,
-    },
-  });
+  const invoice = await prisma.$transaction(async (tx) => {
+    const inv = await tx.invoice.create({
+      data: {
+        invoiceNumber,
+        quoteId: quote.id,
+        clientId: quote.clientId,
+        issueDate: new Date(),
+        dueDate,
+        currency: quote.currency,
+        exchangeRate: quote.exchangeRate,
+        subtotalHt: quote.totalHt,
+        taxAmount: quote.taxAmount,
+        totalTtc: quote.totalTtc,
+        paidAmount: 0,
+        notes: `Généré automatiquement depuis le devis ${quote.quoteNumber}`,
+      },
+    });
 
-  // Mark quote as accepted
-  await prisma.quote.update({
-    where: { id: quote.id },
-    data: { status: QuoteStatus.ACCEPTE },
+    // Mark quote as accepted
+    await tx.quote.update({
+      where: { id: quote.id },
+      data: { status: QuoteStatus.ACCEPTE },
+    });
+
+    return inv;
   });
 
   await logAuditAction(req, 'CONVERT_TO_INVOICE', 'Quote', quote.id, { invoiceNumber });
