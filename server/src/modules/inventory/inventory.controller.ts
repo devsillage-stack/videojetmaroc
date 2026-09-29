@@ -1,9 +1,10 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { ProductType, MachineTechnology, ProductUnit, BatchStatus, Role } from '@prisma/client';
+import { ProductType, MachineTechnology, ProductUnit, BatchStatus, Role, StockMovementType } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import { AuthRequest } from '../../types/index.js';
 import { logAuditAction } from '../../middlewares/audit.middleware.js';
+import { getNextSequenceNumber } from '../../utils/sequencer.js';
 
 const productSchema = z.object({
   partNumber: z.string().min(2),
@@ -270,4 +271,151 @@ export const getStockMovements = async (req: AuthRequest, res: Response): Promis
   });
 
   res.json({ movements });
+};
+
+export const adjustStock = async (req: AuthRequest, res: Response): Promise<void> => {
+  const adjustSchema = z.object({
+    productId: z.string().uuid(),
+    batchId: z.string().uuid().optional().nullable(),
+    quantityDelta: z.number().refine((val) => val !== 0, 'La variation doit être non nulle'),
+    reason: z.string().min(3, 'Le motif d\'ajustement est requis'),
+  });
+
+  const data = adjustSchema.parse(req.body);
+  const userId = req.user?.userId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const product = await tx.product.findUnique({
+      where: { id: data.productId },
+    });
+
+    if (!product) {
+      throw new Error('Article introuvable');
+    }
+
+    const stockBefore = product.stockQuantity;
+    const stockAfter = Math.max(0, stockBefore + data.quantityDelta);
+    const actualDelta = stockAfter - stockBefore;
+
+    await tx.product.update({
+      where: { id: data.productId },
+      data: { stockQuantity: stockAfter },
+    });
+
+    if (data.batchId) {
+      const batch = await tx.stockBatch.findUnique({ where: { id: data.batchId } });
+      if (batch) {
+        const batchAfter = Math.max(0, batch.quantity + data.quantityDelta);
+        await tx.stockBatch.update({
+          where: { id: data.batchId },
+          data: {
+            quantity: batchAfter,
+            status: batchAfter === 0 ? BatchStatus.EPUISE : batch.status,
+          },
+        });
+      }
+    }
+
+    const movementNumber = await getNextSequenceNumber('stockMovement', undefined, tx);
+    const movement = await tx.stockMovement.create({
+      data: {
+        movementNumber,
+        productId: data.productId,
+        batchId: data.batchId || null,
+        userId: userId || null,
+        type: StockMovementType.AJUSTEMENT_INVENTAIRE,
+        quantity: actualDelta,
+        stockBefore,
+        stockAfter,
+        reason: data.reason,
+      },
+    });
+
+    return { product, movement, stockBefore, stockAfter };
+  });
+
+  await logAuditAction(req, 'STOCK_ADJUSTMENT', 'Product', data.productId, {
+    quantityDelta: data.quantityDelta,
+    reason: data.reason,
+  });
+
+  res.json({
+    message: 'Stock ajusté avec succès',
+    ...result,
+  });
+};
+
+export const discardBatch = async (req: AuthRequest, res: Response): Promise<void> => {
+  const batchId = String(req.params.batchId);
+  const { reason = 'Mise au rebut lot périmé ou non-conforme' } = req.body;
+  const userId = req.user?.userId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const batch = await tx.stockBatch.findUnique({
+      where: { id: batchId },
+    });
+
+    if (!batch) {
+      throw new Error('Lot introuvable');
+    }
+
+    const discardedQty = batch.quantity;
+    if (discardedQty <= 0) {
+      throw new Error('Ce lot est déjà épuisé');
+    }
+
+    const product = await tx.product.findUnique({
+      where: { id: batch.productId },
+    });
+
+    if (!product) {
+      throw new Error('Article lié au lot introuvable');
+    }
+
+    // Decrement product stock
+    const productBefore = product.stockQuantity;
+    const productAfter = Math.max(0, productBefore - discardedQty);
+
+    await tx.product.update({
+      where: { id: batch.productId },
+      data: { stockQuantity: productAfter },
+    });
+
+    // Mark batch as PERIME and quantity 0
+    await tx.stockBatch.update({
+      where: { id: batchId },
+      data: {
+        quantity: 0,
+        status: BatchStatus.PERIME,
+      },
+    });
+
+    // Create stock movement
+    const movementNumber = await getNextSequenceNumber('stockMovement', undefined, tx);
+    const movement = await tx.stockMovement.create({
+      data: {
+        movementNumber,
+        productId: batch.productId,
+        batchId: batch.id,
+        userId: userId || null,
+        type: StockMovementType.REBUT_PERIME,
+        quantity: -discardedQty,
+        stockBefore: productBefore,
+        stockAfter: productAfter,
+        reason: `${reason} (Lot ${batch.batchNumber})`,
+      },
+    });
+
+    return { batch, movement, discardedQty };
+  });
+
+  await logAuditAction(req, 'DISCARD_BATCH', 'StockBatch', batchId, {
+    quantity: result.discardedQty,
+    reason,
+  });
+
+  res.json({
+    message: `Lot ${result.batch.batchNumber} (${result.discardedQty} unités) mis au rebut avec succès`,
+    ...result,
+  });
 };

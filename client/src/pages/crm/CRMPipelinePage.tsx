@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,6 +11,8 @@ import {
   User,
   Calendar,
   CheckCircle2,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import { Opportunity, Client } from '../../types/index.js';
@@ -25,6 +28,7 @@ const STAGES = [
 ];
 
 export const CRMPipelinePage: React.FC = () => {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { formatPrice } = useCurrency();
   const queryClient = useQueryClient();
@@ -172,25 +176,44 @@ export const CRMPipelinePage: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Move buttons */}
-                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                      <button
-                        onClick={() => moveStage(opp, 'backward')}
-                        disabled={opp.stage === 'QUALIFICATION'}
-                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"
-                        title="Reculer d'étape"
-                      >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                      </button>
+                    {/* Move buttons & Quick Actions */}
+                    <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => moveStage(opp, 'backward')}
+                          disabled={opp.stage === 'QUALIFICATION'}
+                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                          title="Reculer d'étape"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => moveStage(opp, 'forward')}
+                          disabled={opp.stage === 'GAGNE'}
+                          className="p-1 text-slate-400 hover:text-cyan-600 disabled:opacity-20 cursor-pointer"
+                          title="Avancer d'étape"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                      <button
-                        onClick={() => moveStage(opp, 'forward')}
-                        disabled={opp.stage === 'GAGNE'}
-                        className="p-1 text-slate-400 hover:text-brand-600 disabled:opacity-20"
-                        title="Avancer d'étape"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => navigate(`/quotes?new=true&clientId=${opp.clientId}`)}
+                          className="inline-flex items-center gap-1 py-1 px-1.5 text-[10px] font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-800 rounded-md transition-colors cursor-pointer"
+                          title="Créer un devis pour cette opportunité"
+                        >
+                          <FileText className="w-3 h-3 text-cyan-600" />
+                          <span>Devis</span>
+                        </button>
+                        <button
+                          onClick={() => navigate(`/clients/${opp.clientId}/360`)}
+                          className="inline-flex items-center p-1 text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md transition-colors cursor-pointer"
+                          title="Ouvrir la vue Client 360°"
+                        >
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

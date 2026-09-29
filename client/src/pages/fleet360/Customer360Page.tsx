@@ -111,13 +111,31 @@ export const Customer360Page: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setIsActivityModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-videojet-blue text-white text-xs font-semibold hover:bg-slate-800 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Ajouter une Interaction</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => navigate(`/quotes?new=true&clientId=${client.id}`)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <Coins className="w-4 h-4" />
+            <span>Nouveau Devis</span>
+          </button>
+
+          <button
+            onClick={() => navigate(`/maintenance?tab=tickets&new=true&clientId=${client.id}`)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <Wrench className="w-4 h-4" />
+            <span>Ticket SAV</span>
+          </button>
+
+          <button
+            onClick={() => setIsActivityModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-videojet-blue text-white text-xs font-semibold hover:bg-slate-800 shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter Interaction</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards: Total Invoiced, Balance Due, Fleet Operational Rate, Audits */}

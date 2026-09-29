@@ -214,8 +214,16 @@ export const ClientsPage: React.FC = () => {
 
                 <div className="flex items-center gap-1.5">
                   <button
+                    onClick={() => navigate(`/quotes?new=true&clientId=${c.id}`)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-colors cursor-pointer"
+                    title="Créer un devis pour ce client"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Devis
+                  </button>
+                  <button
                     onClick={() => navigate(`/clients/${c.id}/360`)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-xl transition-colors"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-xl transition-colors cursor-pointer"
                     title="Vue Customer 360° & Timeline"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
@@ -223,7 +231,7 @@ export const ClientsPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setSelectedClient(c)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-videojet-blue rounded-xl transition-colors"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-videojet-blue rounded-xl transition-colors cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     Détails

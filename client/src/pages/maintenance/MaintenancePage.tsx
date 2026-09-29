@@ -106,8 +106,8 @@ export const MaintenancePage: React.FC = () => {
 
   // New Ticket State
   const [ticketForm, setTicketForm] = useState({
-    clientId: '',
-    machineId: '',
+    clientId: searchParams.get('clientId') || '',
+    machineId: searchParams.get('machineId') || '',
     priority: 'NORMALE',
     faultDescription: '',
     errorCode: '',

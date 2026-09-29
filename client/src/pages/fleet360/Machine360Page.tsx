@@ -84,13 +84,31 @@ export const Machine360Page: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setIsQrModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-videojet-blue text-white text-xs font-semibold hover:bg-slate-800 shadow-sm"
-        >
-          <QrCode className="w-4 h-4" />
-          <span>Afficher / Imprimer QR Code</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => navigate(`/maintenance?tab=tickets&new=true&machineId=${machine.id}&clientId=${machine.client?.id}`)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <Wrench className="w-4 h-4" />
+            <span>Déclarer Incident SAV</span>
+          </button>
+
+          <button
+            onClick={() => navigate(`/tco?machineId=${machine.id}&clientId=${machine.client?.id}`)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Simuler TCO / ROI</span>
+          </button>
+
+          <button
+            onClick={() => setIsQrModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-videojet-blue text-white text-xs font-semibold hover:bg-slate-800 shadow-sm transition-colors cursor-pointer"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>QR Code SAV</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards: Warranty, Replacement Score, Operating Hours, Tickets */}

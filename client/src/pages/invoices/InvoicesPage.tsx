@@ -10,6 +10,7 @@ import {
   Calendar,
   AlertCircle,
   FileDown,
+  Eye,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import { Invoice } from '../../types/index.js';
@@ -26,6 +27,7 @@ export const InvoicesPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('VIREMENT_BANCAIRE');
 
@@ -35,6 +37,16 @@ export const InvoicesPage: React.FC = () => {
       const res = await api.get('/invoices', { params: { search } });
       return res.data.invoices as Invoice[];
     },
+  });
+
+  const { data: invoiceDetails, isLoading: isInvoiceDetailsLoading } = useQuery({
+    queryKey: ['invoice-detail', previewInvoice?.id],
+    queryFn: async () => {
+      if (!previewInvoice?.id) return null;
+      const res = await api.get(`/invoices/${previewInvoice.id}`);
+      return res.data.invoice;
+    },
+    enabled: Boolean(previewInvoice?.id),
   });
 
   const recordPaymentMutation = useMutation({
@@ -131,9 +143,17 @@ export const InvoicesPage: React.FC = () => {
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setPreviewInvoice(inv)}
+                          title="Visualiser le détail et les lignes de la facture"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Détails
+                        </button>
+                        <button
                           onClick={() => downloadExport(`/exports/invoices/${inv.id}/pdf`, `Facture_${inv.invoiceNumber}.pdf`)}
                           title="Télécharger la facture en PDF"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
                         >
                           <FileDown className="w-3.5 h-3.5 text-videojet-blue" />
                           PDF
@@ -232,8 +252,147 @@ export const InvoicesPage: React.FC = () => {
               </button>
             </div>
           </form>
-        </Modal>
+      </Modal>
       )}
+
+      {/* Invoice Details Preview Modal */}
+      <Modal
+        isOpen={Boolean(previewInvoice)}
+        onClose={() => setPreviewInvoice(null)}
+        title={`Facture Client — ${previewInvoice?.invoiceNumber || ''}`}
+        maxWidth="2xl"
+      >
+        {isInvoiceDetailsLoading ? (
+          <div className="py-12 text-center text-slate-400">Chargement de la facture...</div>
+        ) : invoiceDetails ? (
+          <div className="space-y-6 text-xs">
+            {/* Header info */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Client Destinataire</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{invoiceDetails.client?.name}</p>
+                <p className="text-xs text-slate-500">{invoiceDetails.client?.city || 'Maroc'}</p>
+                {invoiceDetails.quote && (
+                  <p className="text-[11px] text-cyan-700 font-mono mt-1">Réf Devis : {invoiceDetails.quote.quoteNumber}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Statut & Échéance</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <StatusBadge status={invoiceDetails.status} />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Émise le : {new Date(invoiceDetails.issueDate).toLocaleDateString('fr-FR')}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Échéance : {new Date(invoiceDetails.dueDate).toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Paiement & Devise</p>
+                <p className="text-xs font-semibold text-slate-700 mt-1">{invoiceDetails.paymentMethod || 'Virement bancaire'}</p>
+                <p className="text-xs text-slate-500">Devise : {invoiceDetails.currency || 'MAD'}</p>
+              </div>
+            </div>
+
+            {/* Line items if available */}
+            {invoiceDetails.quote?.items && invoiceDetails.quote.items.length > 0 && (
+              <div className="border border-slate-200/80 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Désignation</th>
+                      <th className="py-2.5 px-3 text-center">Qté</th>
+                      <th className="py-2.5 px-3 text-right">Prix Unitaire</th>
+                      <th className="py-2.5 px-3 text-right">Total HT</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoiceDetails.quote.items.map((item: any, i: number) => (
+                      <tr key={item.id || i} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3">
+                          <p className="font-semibold text-slate-800">{item.description}</p>
+                          {item.product && (
+                            <p className="text-[10px] text-slate-400 font-mono">Réf: {item.product.partNumber}</p>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-medium">{item.quantity}</td>
+                        <td className="py-2.5 px-3 text-right text-slate-600">
+                          {formatPrice(item.unitPrice, invoiceDetails.currency)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                          {formatPrice(item.totalPrice, invoiceDetails.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Financial summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900 text-white p-4 rounded-xl">
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-300">
+                  <span>Total TTC facturé :</span>
+                  <span className="font-bold text-white">{formatPrice(invoiceDetails.totalTtc, invoiceDetails.currency)}</span>
+                </div>
+                <div className="flex justify-between text-emerald-400 font-semibold">
+                  <span>Déjà encaissé :</span>
+                  <span>{formatPrice(invoiceDetails.paidAmount, invoiceDetails.currency)}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5 text-xs sm:border-l sm:border-slate-800 sm:pl-4">
+                <div className="flex justify-between text-base font-extrabold">
+                  <span className="text-slate-300">Solde restant dû :</span>
+                  <span className={invoiceDetails.totalTtc - invoiceDetails.paidAmount > 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                    {formatPrice(invoiceDetails.totalTtc - invoiceDetails.paidAmount, invoiceDetails.currency)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => downloadExport(`/exports/invoices/${invoiceDetails.id}/pdf`, `Facture_${invoiceDetails.invoiceNumber}.pdf`)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+              >
+                <FileDown className="w-3.5 h-3.5 text-videojet-blue" />
+                Télécharger Facture PDF
+              </button>
+
+              <div className="flex items-center gap-2">
+                {invoiceDetails.status !== 'PAYEE' && (
+                  <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'COMPTABILITE', 'DIRECTION']}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inv = invoiceDetails;
+                        setPreviewInvoice(null);
+                        setSelectedInvoice(inv);
+                        setPaymentAmount(inv.totalTtc - inv.paidAmount);
+                      }}
+                      className="inline-flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      Encaisser cette facture
+                    </button>
+                  </PermissionGate>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewInvoice(null)}
+                  className="px-4 py-2 bg-slate-800 text-white rounded-xl font-semibold cursor-pointer"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

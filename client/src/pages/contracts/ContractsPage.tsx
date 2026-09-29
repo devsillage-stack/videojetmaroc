@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,6 +19,7 @@ import { Modal } from '../../components/common/Modal.js';
 import { PermissionGate } from '../../components/common/PermissionGate.js';
 
 export const ContractsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { formatPrice } = useCurrency();
   const queryClient = useQueryClient();
@@ -191,15 +193,25 @@ export const ContractsPage: React.FC = () => {
                   </span>
                 </div>
 
-                <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'RESPONSABLE_SAV', 'TECHNICIEN_SAV']}>
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => recordVisitMutation.mutate(ctr.id)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold transition-colors"
+                    onClick={() => navigate(`/planning?clientId=${ctr.clientId}`)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                    title="Planifier une intervention dans le planning pour ce client"
                   >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    + 1 Visite
+                    <Calendar className="w-3.5 h-3.5" />
+                    Planifier
                   </button>
-                </PermissionGate>
+                  <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'RESPONSABLE_SAV', 'TECHNICIEN_SAV']}>
+                    <button
+                      onClick={() => recordVisitMutation.mutate(ctr.id)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      + 1 Visite
+                    </button>
+                  </PermissionGate>
+                </div>
               </div>
             </div>
           ))

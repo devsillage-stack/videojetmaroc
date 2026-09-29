@@ -14,6 +14,12 @@ import {
   Eye,
   ArrowRight,
   FileDown,
+  Building2,
+  Calendar,
+  Send,
+  XCircle,
+  PackageCheck,
+  Printer,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import { Quote, Client, Product, MachineModel } from '../../types/index.js';
@@ -168,7 +174,50 @@ export const QuotesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      if (selectedQuote) {
+        setSelectedQuote(null);
+      }
     },
+  });
+
+  const convertToOrderMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      const res = await api.post(`/quotes/${quoteId}/convert-to-order`, {});
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      alert('Bon de commande client créé avec succès depuis ce devis !');
+      if (selectedQuote) {
+        setSelectedQuote(null);
+      }
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await api.put(`/quotes/${id}/status`, { status });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote-detail', selectedQuote?.id] });
+      if (selectedQuote && selectedQuote.id === data.quote?.id) {
+        setSelectedQuote((prev: any) => prev ? { ...prev, status: data.quote.status } : null);
+      }
+    },
+  });
+
+  const { data: quoteDetails, isLoading: isQuoteDetailsLoading } = useQuery({
+    queryKey: ['quote-detail', selectedQuote?.id],
+    queryFn: async () => {
+      if (!selectedQuote?.id) return null;
+      const res = await api.get(`/quotes/${selectedQuote.id}`);
+      return res.data.quote;
+    },
+    enabled: Boolean(selectedQuote?.id),
   });
 
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -278,6 +327,14 @@ export const QuotesPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setSelectedQuote(q)}
+                          title="Visualiser et gérer le devis"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 rounded-lg font-semibold text-xs transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Détails
+                        </button>
                         <button
                           onClick={() => downloadExport(`/exports/quotes/${q.id}/pdf`, `Devis_${q.quoteNumber}.pdf`)}
                           title="Télécharger le devis en PDF"
@@ -497,6 +554,168 @@ export const QuotesPage: React.FC = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Quote Detail Modal */}
+      <Modal
+        isOpen={Boolean(selectedQuote)}
+        onClose={() => setSelectedQuote(null)}
+        title={`Détails du Devis — ${selectedQuote?.quoteNumber || ''}`}
+        maxWidth="2xl"
+      >
+        {isQuoteDetailsLoading ? (
+          <div className="py-12 text-center text-slate-400">Chargement des détails du devis...</div>
+        ) : quoteDetails ? (
+          <div className="space-y-6">
+            {/* Header info */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Client Destinataire</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{quoteDetails.client?.name}</p>
+                <p className="text-xs text-slate-500">{quoteDetails.client?.city || 'Maroc'}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Statut & Échéance</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <StatusBadge status={quoteDetails.status} />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Valide jusqu'au : {new Date(quoteDetails.validUntil).toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Conditions & Devise</p>
+                <p className="text-xs font-semibold text-slate-700 mt-1">{quoteDetails.paymentTerms || '30 jours'}</p>
+                <p className="text-xs text-slate-500">Devise : {quoteDetails.currency || 'MAD'}</p>
+              </div>
+            </div>
+
+            {/* Line items table */}
+            <div className="border border-slate-200/80 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Désignation</th>
+                    <th className="py-2.5 px-3 text-center">Qté</th>
+                    <th className="py-2.5 px-3 text-right">Prix Unitaire</th>
+                    <th className="py-2.5 px-3 text-center">Remise</th>
+                    <th className="py-2.5 px-3 text-right">Total HT</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {quoteDetails.items?.map((item: any, i: number) => (
+                    <tr key={item.id || i} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3">
+                        <p className="font-semibold text-slate-800">{item.description}</p>
+                        {item.product && (
+                          <p className="text-[10px] text-slate-400 font-mono">Réf: {item.product.partNumber}</p>
+                        )}
+                        {item.machineModel && (
+                          <p className="text-[10px] text-slate-400 font-mono">Modèle: {item.machineModel.name}</p>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-medium">{item.quantity}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">
+                        {formatPrice(item.unitPrice, quoteDetails.currency)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-slate-500">
+                        {item.discountPercent ? `${item.discountPercent}%` : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                        {formatPrice(item.totalPrice, quoteDetails.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Financial summary */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 text-white p-4 rounded-xl">
+              <div className="space-y-1 text-xs text-slate-400">
+                <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'DIRECTION']}>
+                  {quoteDetails.estimatedMargin !== undefined && (
+                    <p>Marge prévisionnelle : <span className="text-emerald-400 font-bold">{formatPrice(quoteDetails.estimatedMargin, quoteDetails.currency)}</span></p>
+                  )}
+                </PermissionGate>
+                <p>Émis par : {quoteDetails.createdBy ? `${quoteDetails.createdBy.firstName} ${quoteDetails.createdBy.lastName}` : 'NEXORA Commercial'}</p>
+              </div>
+              <div className="text-right space-y-1">
+                <p className="text-xs text-slate-400">Total HT : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.totalHt, quoteDetails.currency)}</span></p>
+                <p className="text-xs text-slate-400">TVA ({quoteDetails.taxRate?.rate || 20}%) : <span className="text-slate-200 font-semibold">{formatPrice(quoteDetails.taxAmount, quoteDetails.currency)}</span></p>
+                <p className="text-base font-extrabold text-cyan-400">Total TTC : {formatPrice(quoteDetails.totalTtc, quoteDetails.currency)}</p>
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3">
+              {/* Status changers */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">Statut :</span>
+                {quoteDetails.status !== 'ENVOYE' && (
+                  <button
+                    onClick={() => updateStatusMutation.mutate({ id: quoteDetails.id, status: 'ENVOYE' })}
+                    disabled={updateStatusMutation.isPending}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Envoyer au Client
+                  </button>
+                )}
+                {quoteDetails.status !== 'ACCEPTE' && (
+                  <button
+                    onClick={() => updateStatusMutation.mutate({ id: quoteDetails.id, status: 'ACCEPTE' })}
+                    disabled={updateStatusMutation.isPending}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Valider / Accepter
+                  </button>
+                )}
+                {quoteDetails.status !== 'REFUSE' && (
+                  <button
+                    onClick={() => updateStatusMutation.mutate({ id: quoteDetails.id, status: 'REFUSE' })}
+                    disabled={updateStatusMutation.isPending}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    Refuser
+                  </button>
+                )}
+              </div>
+
+              {/* Conversion and PDF buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => downloadExport(`/exports/quotes/${quoteDetails.id}/pdf`, `Devis_${quoteDetails.quoteNumber}.pdf`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-videojet-blue" />
+                  Exporter PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => convertToOrderMutation.mutate(quoteDetails.id)}
+                  disabled={convertToOrderMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <PackageCheck className="w-3.5 h-3.5" />
+                  {convertToOrderMutation.isPending ? 'Création...' : 'Créer Bon de Commande'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => convertToInvoiceMutation.mutate(quoteDetails.id)}
+                  disabled={convertToInvoiceMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-videojet-blue hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  {convertToInvoiceMutation.isPending ? 'Facturation...' : 'Convertir en Facture'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

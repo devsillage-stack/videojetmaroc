@@ -14,6 +14,8 @@ import {
   CheckCircle,
   FileSpreadsheet,
   RotateCcw,
+  SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import api from '../../services/api.js';
 import { Product, StockBatch } from '../../types/index.js';
@@ -35,6 +37,14 @@ export const InventoryPage: React.FC = () => {
 
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
+  const [isAdjustStockOpen, setIsAdjustStockOpen] = useState(false);
+  const [selectedProductForAdjust, setSelectedProductForAdjust] = useState<Product | null>(null);
+  const [adjustForm, setAdjustForm] = useState({
+    productId: '',
+    deltaQuantity: 0,
+    reason: 'Inventaire physique périodique',
+    notes: '',
+  });
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -113,6 +123,39 @@ export const InventoryPage: React.FC = () => {
     },
   });
 
+  const adjustStockMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await api.post('/inventory/adjust', payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      queryClient.invalidateQueries({ queryKey: ['expiration-alerts'] });
+      setIsAdjustStockOpen(false);
+      setSelectedProductForAdjust(null);
+      setAdjustForm({ productId: '', deltaQuantity: 0, reason: 'Inventaire physique périodique', notes: '' });
+      alert('Stock ajusté avec succès.');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.error || 'Erreur lors de l’ajustement de stock');
+    },
+  });
+
+  const discardBatchMutation = useMutation({
+    mutationFn: async ({ batchId, reason }: { batchId: string; reason?: string }) => {
+      const res = await api.post(`/inventory/batches/${batchId}/discard`, { reason });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      queryClient.invalidateQueries({ queryKey: ['expiration-alerts'] });
+      alert('Lot mis au rebut avec succès et déduit du stock.');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.error || 'Erreur lors de la mise au rebut');
+    },
+  });
+
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createProductMutation.mutate({
@@ -161,15 +204,26 @@ export const InventoryPage: React.FC = () => {
           </button>
           <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'MAGASINIER']}>
             <button
+              onClick={() => {
+                setSelectedProductForAdjust(null);
+                setAdjustForm({ productId: products?.[0]?.id || '', deltaQuantity: 0, reason: 'Inventaire physique périodique', notes: '' });
+                setIsAdjustStockOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-emerald-600" />
+              Ajustement Stock
+            </button>
+            <button
               onClick={() => setIsAddBatchOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Calendar className="w-4 h-4 text-cyan-600" />
               {t('inventory.addBatch')}
             </button>
             <button
               onClick={() => setIsAddProductOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-videojet-blue hover:bg-slate-800 text-white rounded-xl shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-videojet-blue hover:bg-slate-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               {t('inventory.addProduct')}
@@ -298,12 +352,13 @@ export const InventoryPage: React.FC = () => {
                       <th className="py-3 px-4 text-slate-400">Coût Achat (Confidentiel)</th>
                     </PermissionGate>
                     <th className="py-3 px-4">État Stock</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isProductsLoading ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
                         Chargement du catalogue...
                       </td>
                     </tr>
@@ -342,12 +397,33 @@ export const InventoryPage: React.FC = () => {
                               </span>
                             )}
                           </td>
+                          <td className="py-3 px-4 text-right">
+                            <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'MAGASINIER']}>
+                              <button
+                                onClick={() => {
+                                  setSelectedProductForAdjust(p);
+                                  setAdjustForm({
+                                    productId: p.id,
+                                    deltaQuantity: 0,
+                                    reason: 'Inventaire physique périodique',
+                                    notes: '',
+                                  });
+                                  setIsAdjustStockOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                                title="Ajuster manuellement le stock de cette référence"
+                              >
+                                <SlidersHorizontal className="w-3.5 h-3.5 text-videojet-blue" />
+                                Ajuster
+                              </button>
+                            </PermissionGate>
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
                         Aucun article correspondant.
                       </td>
                     </tr>
@@ -372,6 +448,7 @@ export const InventoryPage: React.FC = () => {
                   <th className="py-3 px-4">{t('inventory.expiration')}</th>
                   <th className="py-3 px-4">{t('inventory.location')}</th>
                   <th className="py-3 px-4">Statut Péremption</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -391,11 +468,28 @@ export const InventoryPage: React.FC = () => {
                       <td className="py-3 px-4">
                         <StatusBadge status={b.status} />
                       </td>
+                      <td className="py-3 px-4 text-right">
+                        <PermissionGate roles={['SUPER_ADMIN', 'ADMIN', 'MAGASINIER']}>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Confirmez-vous la mise au rebut définitive du lot ${b.batchNumber} (${b.quantity} ${b.product?.unit || 'unités'}) pour péremption ?`)) {
+                                discardBatchMutation.mutate({ batchId: b.id, reason: 'Péremption chimique / hors tolérance constructeur' });
+                              }
+                            }}
+                            disabled={discardBatchMutation.isPending}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            title="Mettre au rebut le lot périmé et ajuster le stock"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Mettre au rebut
+                          </button>
+                        </PermissionGate>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
                       Aucun lot en alerte de péremption. Tous les consommables sont valides.
                     </td>
                   </tr>
@@ -625,6 +719,131 @@ export const InventoryPage: React.FC = () => {
               className="px-4 py-2 font-semibold bg-videojet-blue text-white hover:bg-slate-800 rounded-xl shadow-xs"
             >
               {addBatchMutation.isPending ? 'Enregistrement...' : 'Enregistrer la réception'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Stock Adjustment Modal */}
+      <Modal
+        isOpen={isAdjustStockOpen}
+        onClose={() => {
+          setIsAdjustStockOpen(false);
+          setSelectedProductForAdjust(null);
+        }}
+        title="Ajustement Manuel d'Inventaire"
+        subtitle="Régularisation de stock avec traçabilité d'audit"
+        maxWidth="lg"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const prodId = selectedProductForAdjust?.id || adjustForm.productId;
+            if (!prodId) {
+              alert('Veuillez sélectionner un article');
+              return;
+            }
+            if (Number(adjustForm.deltaQuantity) === 0) {
+              alert('La variation de stock ne peut pas être égale à 0');
+              return;
+            }
+            adjustStockMutation.mutate({
+              productId: prodId,
+              deltaQuantity: Number(adjustForm.deltaQuantity),
+              reason: adjustForm.reason,
+              notes: adjustForm.notes,
+            });
+          }}
+          className="space-y-4 text-xs"
+        >
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Article / Consommable à ajuster *</label>
+            {selectedProductForAdjust ? (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <p className="font-bold text-slate-900">{selectedProductForAdjust.name}</p>
+                <p className="text-slate-500 font-mono text-[11px]">Réf: {selectedProductForAdjust.partNumber} — Stock actuel : {selectedProductForAdjust.stockQuantity} {selectedProductForAdjust.unit}</p>
+              </div>
+            ) : (
+              <select
+                value={adjustForm.productId}
+                onChange={(e) => setAdjustForm({ ...adjustForm, productId: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                required
+              >
+                <option value="">Sélectionner un article...</option>
+                {products?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.partNumber} — {p.name} (Stock actuel: {p.stockQuantity} {p.unit})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Variation de stock (Delta) *
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="1"
+                value={adjustForm.deltaQuantity}
+                onChange={(e) => setAdjustForm({ ...adjustForm, deltaQuantity: parseFloat(e.target.value) || 0 })}
+                placeholder="Ex: +5 pour une entrée trouvée, -2 pour une casse"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none font-bold text-slate-800"
+                required
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Astuce : Entrez un nombre positif (ex: <b>+5</b>) pour ajouter du stock, ou négatif (ex: <b>-3</b>) pour en déduire.
+            </p>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Motif réglementaire *</label>
+            <select
+              value={adjustForm.reason}
+              onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
+              required
+            >
+              <option value="Inventaire physique périodique">Inventaire physique périodique / tournant</option>
+              <option value="Casse / Avarie entrepôt">Casse / Avarie entrepôt</option>
+              <option value="Retour pièce SAV client">Retour pièce SAV client</option>
+              <option value="Prélèvement démonstration showroom">Prélèvement démonstration showroom</option>
+              <option value="Correction écart de saisie">Correction écart de saisie</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Remarques & Justification d'Audit</label>
+            <textarea
+              value={adjustForm.notes}
+              onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
+              rows={2}
+              placeholder="Ex: Comptage physique étagère B3 par le responsable logistique..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdjustStockOpen(false);
+                setSelectedProductForAdjust(null);
+              }}
+              className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={adjustStockMutation.isPending}
+              className="px-4 py-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {adjustStockMutation.isPending ? 'Enregistrement...' : 'Valider l’Ajustement'}
             </button>
           </div>
         </form>

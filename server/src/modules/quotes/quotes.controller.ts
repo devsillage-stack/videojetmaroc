@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { QuoteStatus, Role } from '@prisma/client';
+import { QuoteStatus, OrderStatus, Role } from '@prisma/client';
 import prisma from '../../config/prisma.js';
 import { AuthRequest } from '../../types/index.js';
 import { logAuditAction } from '../../middlewares/audit.middleware.js';
@@ -256,4 +256,68 @@ export const convertQuoteToInvoice = async (req: AuthRequest, res: Response): Pr
   await logAuditAction(req, 'CONVERT_TO_INVOICE', 'Quote', quote.id, { invoiceNumber });
 
   res.status(201).json({ invoice, message: 'Facture générée avec succès depuis le devis' });
+};
+
+export const convertQuoteToOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  const { deliveryAddress, estimatedDeliveryDate, notes } = req.body;
+
+  const quote = await prisma.quote.findUnique({
+    where: { id },
+    include: { items: true, client: true },
+  });
+
+  if (!quote) {
+    res.status(404).json({ error: 'Devis introuvable' });
+    return;
+  }
+
+  const orderNumber = await getNextSequenceNumber('order');
+
+  const order = await prisma.$transaction(async (tx) => {
+    const ord = await tx.order.create({
+      data: {
+        orderNumber,
+        quoteId: quote.id,
+        clientId: quote.clientId,
+        createdById: req.user!.userId,
+        status: OrderStatus.CONFIRMEE,
+        currency: quote.currency,
+        exchangeRate: quote.exchangeRate,
+        subtotalHt: quote.totalHt,
+        taxAmount: quote.taxAmount,
+        totalTtc: quote.totalTtc,
+        deliveryAddress: deliveryAddress || quote.client.address || null,
+        estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : null,
+        notes: notes || `Commande générée depuis le devis ${quote.quoteNumber}`,
+        items: {
+          create: quote.items.map((it) => ({
+            itemType: it.itemType,
+            machineModelId: it.machineModelId,
+            productId: it.productId,
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            totalLineHt: it.totalLineHt,
+          })),
+        },
+      },
+      include: {
+        items: true,
+        client: true,
+      },
+    });
+
+    // Mark quote as accepted
+    await tx.quote.update({
+      where: { id: quote.id },
+      data: { status: QuoteStatus.ACCEPTE },
+    });
+
+    return ord;
+  });
+
+  await logAuditAction(req, 'CONVERT_TO_ORDER', 'Quote', quote.id, { orderNumber });
+
+  res.status(201).json({ order, message: 'Commande client créée avec succès depuis le devis' });
 };
